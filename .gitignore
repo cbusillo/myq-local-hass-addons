@@ -1,0 +1,11 @@
+.venv/
+.idea/
+__pycache__/
+*.pyc
+.ruff_cache/
+dist/
+build/
+.private/
+enrollment.json
+*.pcap
+*.tls
