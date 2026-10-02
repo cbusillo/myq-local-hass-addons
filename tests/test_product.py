@@ -3,8 +3,9 @@ import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import MagicMock, Mock, patch
 
+from myq_local.app import settings
 from myq_local.mqtt_bridge import Bridge, BrokerSettings
 from myq_local.profile import InvalidProfile, Profile, save_profile
 from myq_local.protocol import ProtocolError, Session, frame
@@ -262,3 +263,47 @@ class BridgeTests(unittest.TestCase):
         options = self.b.client.subscribe.call_args.kwargs["options"]
         self.assertTrue(options.retainAsPublished)
         self.assertEqual(options.retainHandling, 2)
+
+
+class ServiceSettingsTests(unittest.TestCase):
+    def service_settings(self, options):
+        service = {
+            "result": "ok",
+            "data": {
+                "host": "broker.test",
+                "port": 1883,
+                "ssl": False,
+                "username": "generated",
+                "password": "synthetic-generated",
+            },
+        }
+        opener = MagicMock()
+        opener.open.return_value.__enter__.return_value.read.return_value = json.dumps(
+            service
+        ).encode()
+        with (
+            patch.dict("os.environ", {"SUPERVISOR_TOKEN": "synthetic-service-token"}),
+            patch("myq_local.app.urllib.request.build_opener", return_value=opener),
+        ):
+            return settings(options)
+
+    def test_configured_login_overrides_only_service_credentials(self):
+        original = self.service_settings({})
+        override = self.service_settings(
+            {"mqtt_username": "configured", "mqtt_password": "synthetic-configured"}
+        )
+        self.assertEqual(
+            (original.host, original.port, original.tls),
+            (override.host, override.port, override.tls),
+        )
+        self.assertNotEqual(original.username, override.username)
+        self.assertEqual(override.password, "synthetic-configured")
+        self.assertNotIn(override.password, repr(override))
+
+    def test_partial_credential_override_is_rejected(self):
+        for options in (
+            {"mqtt_username": "configured"},
+            {"mqtt_password": "synthetic-configured"},
+        ):
+            with self.assertRaises(ValueError):
+                self.service_settings(options)

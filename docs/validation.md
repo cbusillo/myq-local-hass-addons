@@ -15,7 +15,7 @@ requested Gemini 3.1 Pro (High); the CLI did not independently report the model.
   still an explicit qualification gap; this is not a guarantee of end-to-end
   freshness under every network/host failure.
 
-Fifteen product tests and an isolated container smoke test pass. The smoke test
+Seventeen product tests and an isolated container smoke test pass. The smoke test
 uses a real broker and simulated TLS hub with invented credentials, rejects a
 retained open, and exercises two explicit open/close cycles. It does not
 establish installed Home Assistant or physical acceptance.
