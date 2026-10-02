@@ -1,5 +1,5 @@
 name: myQ Local
-version: "0.1.0"
+version: "0.1.1"
 slug: myq_local
 description: Experimental local control of stock MYQ-G0401-ES hubs
 arch:
