@@ -44,6 +44,12 @@ def settings(options):
     if data.get("result") != "ok":
         raise ValueError("mqtt_service_unavailable")
     row = data["data"]
+    if options.get("mqtt_username") or options.get("mqtt_password"):
+        if not options.get("mqtt_username") or not options.get("mqtt_password"):
+            raise ValueError("both_mqtt_credentials_required")
+        row = dict(
+            row, username=options["mqtt_username"], password=options["mqtt_password"]
+        )
     return BrokerSettings(
         row["host"],
         int(row["port"]),

@@ -11,6 +11,8 @@ import uuid
 from pathlib import Path
 
 import paho.mqtt.client as mqtt
+from paho.mqtt.packettypes import PacketTypes
+from paho.mqtt.properties import Properties
 from test_product import BUNDLE
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -156,16 +158,18 @@ def run():
                 and "position_topic" not in config
             )
             command = config["command_topic"]
+            expiry = Properties(PacketTypes.PUBLISH)
+            expiry.MessageExpiryInterval = 2
             reader.publish(command, "OPEN", retain=True).wait_for_publish(3)
             time.sleep(1)
             assert actions == ["READY"], "retained_motion_was_not_rejected"
             reader.publish(command, "", retain=True).wait_for_publish(3)
-            reader.publish(command, "CLOSE").wait_for_publish(3)
+            reader.publish(command, "CLOSE", properties=expiry).wait_for_publish(3)
             time.sleep(0.5)
             assert actions == ["READY"], "closed_to_close_moved"
             for _ in range(2):
                 prior = len(actions)
-                reader.publish(command, "OPEN").wait_for_publish(3)
+                reader.publish(command, "OPEN", properties=expiry).wait_for_publish(3)
                 wait(
                     lambda prior=prior: (
                         len(actions) == prior + 1 and actions[-1] == "OPEN"
@@ -177,7 +181,7 @@ def run():
                         for topic, payload in messages
                     )
                 )
-                reader.publish(command, "CLOSE").wait_for_publish(3)
+                reader.publish(command, "CLOSE", properties=expiry).wait_for_publish(3)
                 wait(
                     lambda prior=prior: (
                         len(actions) == prior + 2 and actions[-1] == "CLOSE"

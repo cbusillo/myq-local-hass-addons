@@ -178,10 +178,15 @@ class BridgeTests(unittest.TestCase):
         self.b.connected.set()
         self.b.new_hub_session()
         self.b.publish_state(2, True)
+        self.b.tick()
 
     def message(self, payload=b"OPEN", retain=False, dup=False):
         return SimpleNamespace(
-            topic="myq_local/testnode/command", payload=payload, retain=retain, dup=dup
+            topic="myq_local/testnode/command",
+            payload=payload,
+            retain=retain,
+            dup=dup,
+            properties=SimpleNamespace(MessageExpiryInterval=2),
         )
 
     def test_only_fresh_explicit_messages_are_delivered(self):
@@ -214,6 +219,33 @@ class BridgeTests(unittest.TestCase):
         self.b.control_enabled = False
         self.b.on_message(None, None, self.message())
         self.assertIsNone(self.b.take_command())
+
+    def test_missing_expiry_and_paused_control_loop_reject_motion(self):
+        msg = self.message()
+        msg.properties = None
+        self.b.on_message(None, None, msg)
+        self.assertIsNone(self.b.take_command())
+        self.now = 30
+        self.b.on_message(None, None, self.message())
+        self.assertIsNone(self.b.take_command())
+        self.b.tick()
+        self.b.on_message(None, None, self.message())
+        self.assertEqual(self.b.take_command(), "OPEN")
+
+    def test_state_republished_on_reconnect_only_or_change(self):
+        self.b.client.publish.reset_mock()
+        self.b.publish_state(2, True)
+        self.b.publish_state(2, True)
+        self.b.client.publish.assert_not_called()
+        self.b.on_connect(
+            self.b.client, None, None, SimpleNamespace(is_failure=False), None
+        )
+        self.b.on_subscribe(None, None, 1, [SimpleNamespace(is_failure=False)], None)
+        self.b.client.publish.reset_mock()
+        self.b.publish_state(2, True)
+        self.assertEqual(self.b.client.publish.call_count, 2)
+        self.b.publish_state(9, True)
+        self.assertEqual(self.b.client.publish.call_count, 4)
 
     def test_discovery_exposes_only_validated_controls(self):
         row = self.b.discovery()

@@ -54,6 +54,7 @@ def run_server(profile, bridge, stop, allowed_peers, host="0.0.0.0", port=8883):
                         last_poll = last_publish = time.monotonic()
                         last_receive = time.monotonic()
                         while not stop.is_set():
+                            bridge.tick()
                             try:
                                 data = tls.recv(1024)
                             except TimeoutError:

@@ -1,6 +1,7 @@
 """Existing-broker integration: fresh sessions, no retained/replayed motion."""
 
 import json
+import logging
 import queue
 import threading
 import time
@@ -9,6 +10,8 @@ from dataclasses import dataclass, field
 
 import paho.mqtt.client as mqtt
 from paho.mqtt.subscribeoptions import SubscribeOptions
+
+LOG = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -34,6 +37,8 @@ class Bridge:
         self.generation = 0
         self.hub_epoch = 0
         self.hub_available = False
+        self.last_tick = float("-inf")
+        self.last_published = None
         self.client = mqtt.Client(
             mqtt.CallbackAPIVersion.VERSION2,
             client_id=f"myq-local-{uuid.uuid4().hex}",
@@ -64,6 +69,7 @@ class Bridge:
             "optimistic": False,
             "retain": False,
             "qos": 0,
+            "message_expiry_interval": {"seconds": 2},
             "payload_open": "OPEN" if self.control_enabled else None,
             "payload_close": "CLOSE" if self.control_enabled else None,
             "payload_stop": None,
@@ -87,8 +93,11 @@ class Bridge:
         with self.lock:
             self.connected.clear()
             self.invalidate_commands()
+            self.last_published = None
             if reason_code.is_failure:
+                LOG.warning("MQTT connection rejected; check service credentials")
                 return
+            LOG.info("Existing MQTT broker connected")
             client.publish(f"{self.prefix}/availability", "offline", retain=True)
             client.publish(
                 f"homeassistant/cover/{self.node_id}/config",
@@ -111,10 +120,20 @@ class Bridge:
             self.connected.clear()
             self.invalidate_commands()
 
+    def tick(self):
+        with self.lock:
+            self.last_tick = self.clock()
+
     def on_message(self, client, userdata, message):
+        expiry = getattr(
+            getattr(message, "properties", None), "MessageExpiryInterval", None
+        )
         with self.lock:
             if (
                 not self.control_enabled
+                or type(expiry) is not int
+                or not 0 < expiry <= 2
+                or not 0 <= self.clock() - self.last_tick <= 2
                 or not self.connected.is_set()
                 or not self.hub_available
                 or message.topic != f"{self.prefix}/command"
@@ -161,6 +180,10 @@ class Bridge:
         with self.lock:
             self.hub_available = fresh and state in (2, 9)
         if self.connected.is_set():
+            current = (state, self.hub_available)
+            if current == self.last_published:
+                return
+            self.last_published = current
             value = "closed" if state == 2 else "open" if state == 9 else "None"
             self.client.publish(f"{self.prefix}/state", value, retain=True)
             self.client.publish(

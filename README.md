@@ -31,7 +31,12 @@ validation target. Other hardware and firmware versions are not qualified.
    not been established for this hub.
 
 The app obtains broker connection details from Supervisor's existing MQTT
-service. Its setup web UI is exposed through Home Assistant ingress, not a
+service. If that service advertises credentials that your broker overrides,
+set **MQTT username** and **MQTT password** to your existing broker login in
+this app's configuration. Leave both blank for automatic service credentials;
+the broker address and TLS settings still come from Supervisor. These options
+are stored privately by Supervisor and may be included in app backups. This
+app does not create users or restart the broker. Its setup web UI is exposed through Home Assistant ingress, not a
 separate host web port. Keep the hub listener LAN-only.
 
 ## One-time enrollment
@@ -61,7 +66,11 @@ makes the cover unavailable.
 Motion requires an explicit `OPEN` or `CLOSE` publication, controls enabled,
 a current hub connection and matching fresh state. Retained and duplicate
 commands are rejected. Commands expire after two seconds in the bridge queue;
-MQTT and hub reconnections discard pending requests. A write is never retried.
+MQTT and hub reconnections discard pending requests. MQTT 5 command messages
+require a positive expiry no greater than two seconds; the discovery config
+sets this using Home Assistant's built-in message expiry. A paused control
+loop also rejects commands until it resumes. Network delivery time after a
+broker sends a message is still a qualification limit. A write is never retried.
 If movement remains unconfirmed, the session rejects further movement until a
 matching status transition or a fresh connection. Check the physical door
 before restarting the app in that situation.

@@ -26,8 +26,12 @@ options:
   hub_ip: ""
   translated_peer_ip: ""
   control_enabled: false
+  mqtt_username: ""
+  mqtt_password: ""
 schema:
   name: str
   hub_ip: str
   translated_peer_ip: str?
   control_enabled: bool
+  mqtt_username: str?
+  mqtt_password: password?
