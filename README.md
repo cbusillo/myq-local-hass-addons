@@ -11,9 +11,12 @@ validation target. Other hardware and firmware versions are not qualified.
 
 ## Installation
 
-1. Install the `myq_local` directory as a local Home Assistant app, or use an
-   app repository once a reviewed repository URL is published. This source
-   tree includes `repository.yaml` and the app's `config.yaml` and Dockerfile.
+1. In Home Assistant, open **Settings → Add-ons → Add-on Store**, use the
+   three-dot menu → **Repositories**, and add
+   `https://github.com/cbusillo/myq-local-hass-addons`. Then install **myQ
+   Local** from the store. Installing the local `myq_local` directory as a
+   local app also works; this source tree includes `repository.yaml` and the
+   app's `config.yaml` and Dockerfile.
 2. Set **Hub IP** to the hub's reserved IPv4 address. If your router applies
    source NAT when forwarding the hub, set **Translated peer IP** to that
    router's LAN address. Leave **Control enabled** off initially.
