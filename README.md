@@ -103,7 +103,14 @@ Its hub runs on loopback with invented credentials; it never contacts a real
 garage device. [Protocol evidence](docs/protocol.md) separates field validation
 from synthetic tests and remaining gaps.
 
-Runtime sources were independently written from observed protocol behavior.
-The AGPL firmware/capture research tools used during discovery are not included
-in this runtime package. myQ is a Chamberlain Group trademark; this project is
-not affiliated with Chamberlain Group.
+## Credits and license
+
+This project is **AGPL-3.0-or-later**. Its design is adapted from
+[StanleyCA/MyQ-Security2.0-HomeAssistant](https://github.com/StanleyCA/MyQ-Security2.0-HomeAssistant)
+(AGPL-3.0), a local myQ bridge for the 050DCTWF logic board; this project adapts
+that approach to the stock MYQ-G0401-ES hub and re-implements the runtime for
+that hardware. See [CREDITS.md](CREDITS.md) for full attribution, including the
+additional research consulted. The AGPL firmware/capture research tools used
+during discovery are not included in this runtime package. myQ and Chamberlain
+are trademarks of the Chamberlain Group; this project is not affiliated with
+Chamberlain Group.
