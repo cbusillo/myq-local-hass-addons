@@ -2,7 +2,7 @@
 name = "myq-local-ha"
 version = "0.1.1"
 description = "Experimental local control of stock MYQ-G0401-ES hubs through Home Assistant MQTT"
-license = "MIT"
+license = "AGPL-3.0-or-later"
 license-files = ["LICENSE"]
 requires-python = ">=3.13"
 dependencies = ["paho-mqtt==2.1.0"]
