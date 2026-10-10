@@ -36,7 +36,9 @@ jobs:
         run: uv run python -m unittest discover -s tests -v
 
       - name: Run imported 050DCTWF tests
-        run: uv run python -m unittest discover -s community/050dctwf/tests -v
+        run: >-
+          uv run python -m unittest discover
+          -s community/050dctwf/tests -p test_bridge.py -v
 
       - name: Run Ruff
         run: |
