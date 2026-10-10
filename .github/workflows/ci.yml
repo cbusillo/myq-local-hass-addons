@@ -58,7 +58,10 @@ jobs:
           with ZipFile(wheel) as archive:
               names = set(archive.namelist())
           required = {
+              "myq_local/acquire.py",
               "myq_local/enroll.py",
+              "myq_local/openocd/g0401.cfg",
+              "myq_local/openocd/read_g0401_page.tcl",
               "myq_local/_community/fwtool.py",
               "myq_local/_community/psmtool.py",
           }
