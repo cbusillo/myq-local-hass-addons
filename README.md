@@ -71,6 +71,41 @@ door identifier. Never publish it, a raw firmware image, or an unredacted
 capture in an issue. The app does not return enrollment contents in its web UI
 or diagnostics. App data and Home Assistant backups may contain the key.
 
+### One starting point
+
+Run `uv run myq-enroll profiles` to identify the applicable enrollment path.
+The assistant keeps the hardware-specific steps behind one command:
+
+- `MYQ-G0401-ES` is the maintained profile. The current command can extract
+  an enrollment bundle from an already acquired 8 MiB mapped image. Direct
+  ST-Link acquisition remains gated until the removable fixture and complete
+  preflight are documented and owner-observed.
+- `050DCTWF` is a community profile. It accepts an existing verified 4 MiB or
+  8 MiB SPI dump and reuses StanleyCA's preserved PSM parser. Hardware
+  acquisition remains covered by the community flash guide.
+
+For either model, supply the paired six-byte door ID as twelve hexadecimal
+characters and choose a new output path. This example produces the G0401
+bundle imported by the root app:
+
+```sh
+uv run myq-enroll extract \
+  --model MYQ-G0401-ES \
+  --image /private/path/to/your-image.bin \
+  --door-id-file /private/path/to/door-id.txt \
+  --output /private/path/to/enrollment.json
+```
+
+The command refuses an existing output file, writes a new file with owner-only
+permissions, and does not print credentials. Keep the input image and generated
+file private. The 050DCTWF door ID still comes from its documented decrypted
+MQTT capture workflow; dump parsing alone does not recover it. Its output is a
+community credential bundle with `serial`, `psk`, and `device_id` fields for
+the community app's configuration, rather than an import for the root G0401
+app. The door-ID file must contain only the twelve hexadecimal characters and
+have owner-only permissions (`0600`); this keeps the identifier out of shell
+history and process listings.
+
 ## State and command behavior
 
 Only freshly authenticated, target-matched status reports drive availability.

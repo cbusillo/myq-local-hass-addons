@@ -7,5 +7,9 @@ dist/
 build/
 .private/
 enrollment.json
+enrollment*.json
+credentials*.json
+*.bin
+*.img
 *.pcap
 *.tls

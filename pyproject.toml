@@ -9,6 +9,7 @@ dependencies = ["paho-mqtt==2.1.0"]
 
 [project.scripts]
 myq-local = "myq_local.app:main"
+myq-enroll = "myq_local.enroll:main"
 
 [build-system]
 requires = ["hatchling>=1.27,<2"]
@@ -16,6 +17,10 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["myq_local/src/myq_local"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"community/050dctwf/analysis/fwtool.py" = "myq_local/_community/fwtool.py"
+"community/050dctwf/analysis/psmtool.py" = "myq_local/_community/psmtool.py"
 
 [dependency-groups]
 dev = ["ruff>=0.14,<1", "pyyaml>=6,<7"]
