@@ -92,7 +92,7 @@ bundle imported by the root app:
 uv run myq-enroll extract \
   --model MYQ-G0401-ES \
   --image /private/path/to/your-image.bin \
-  --door-id 84XXXXXXXXXX \
+  --door-id-file /private/path/to/door-id.txt \
   --output /private/path/to/enrollment.json
 ```
 
@@ -100,9 +100,11 @@ The command refuses an existing output file, writes a new file with owner-only
 permissions, and does not print credentials. Keep the input image and generated
 file private. The 050DCTWF door ID still comes from its documented decrypted
 MQTT capture workflow; dump parsing alone does not recover it. Its output is a
-community credential bundle with `serial`, `psk`, and `door_id` fields for
+community credential bundle with `serial`, `psk`, and `device_id` fields for
 the community app's configuration, rather than an import for the root G0401
-app.
+app. The door-ID file must contain only the twelve hexadecimal characters and
+have owner-only permissions (`0600`); this keeps the identifier out of shell
+history and process listings.
 
 ## State and command behavior
 

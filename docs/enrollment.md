@@ -91,7 +91,7 @@ image:
 
 | Profile | Acquisition input | Parser | Support |
 |---|---|---|---|
-| MYQ-G0401-ES | Exact 8 MiB mapped AP1 image | Realtek append-log selection plus the audited key unwrap | Maintained |
+| MYQ-G0401-ES firmware 1.10 | Exact 8 MiB mapped AP1 image | Specimen-derived Realtek append-log selection plus the audited key unwrap | Maintained experimental |
 | 050DCTWF | Exact 4 MiB or 8 MiB SPI image | Preserved StanleyCA WMPT/PSMv2 parser and key unwrap | Community |
 
 The assistant requires an explicit model and refuses size, partition, record,
@@ -100,7 +100,7 @@ ambiguous probe output. Output uses a newly created owner-only file and is never
 printed.
 
 Direct G0401 programmer control is deliberately absent from this first stage.
-The retained reader has bounded identity and address guards, but publishing a
+Private validation evidence includes bounded identity and address guards, but publishing a
 hardware command requires the removable fixture, voltage and orientation
 preflight, stop procedure, and another owner-observed run. The 050DCTWF profile
 likewise imports a dump rather than controlling a CH341 programmer. Its
@@ -108,5 +108,5 @@ likewise imports a dump rather than controlling a CH341 programmer. Its
 
 The G0401 output is accepted by the root app's enrollment importer. The
 050DCTWF output instead names the community app's `serial`, `psk`, and
-`door_id` configuration fields. The two runtime apps are still
+`device_id` configuration fields. The two runtime apps are still
 hardware-specific even though enrollment begins with one command.

@@ -48,6 +48,25 @@ jobs:
       - name: Build Python package
         run: uv build
 
+      - name: Verify enrollment parser packaging
+        run: |
+          uv run python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+
+          wheel = next(Path("dist").glob("*.whl"))
+          with ZipFile(wheel) as archive:
+              names = set(archive.namelist())
+          required = {
+              "myq_local/enroll.py",
+              "myq_local/_community/fwtool.py",
+              "myq_local/_community/psmtool.py",
+          }
+          missing = required - names
+          if missing:
+              raise SystemExit(f"missing packaged enrollment files: {sorted(missing)}")
+          PY
+
       - name: Build root app image
         run: docker build -t myq-local:0.1.0-test myq_local
 

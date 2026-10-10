@@ -25,9 +25,9 @@ def wrapped_key():
     return psmtool.encrypt_block(KEY[:8]) + psmtool.encrypt_block(KEY[8:])
 
 
-def g0401_image():
+def g0401_image(old_sequence=19, new_sequence=20, omit_newest=()):
     data = bytearray(b"\xff" * (8 * 1024 * 1024))
-    for page, sequence in ((1, 19), (2, 20)):
+    for page, sequence in ((1, old_sequence), (2, new_sequence)):
         base = 0x202000 + page * 4096
         struct.pack_into("<II", data, base, 0x635E | sequence << 16, 1024)
     base = 0x202000 + 2 * 4096
@@ -42,6 +42,8 @@ def g0401_image():
     }
     cursor = 10
     for logical, value in values.items():
+        if logical in omit_newest:
+            continue
         struct.pack_into("<I", data, base + cursor * 4, int.from_bytes(value, "little"))
         struct.pack_into("<I", data, base + (cursor + 1) * 4, logical | 1 << 16)
         cursor += 2
@@ -78,6 +80,14 @@ class EnrollmentTests(unittest.TestCase):
             (result.identity, result.psk, result.door_id), (IDENTITY, KEY, DOOR)
         )
 
+    def test_g0401_sequence_wrap_selects_zero_as_newest(self):
+        result = extract_g0401(g0401_image(255, 0), DOOR)
+        self.assertEqual(result.psk, KEY)
+
+    def test_g0401_never_mixes_credentials_across_pages(self):
+        with self.assertRaisesRegex(EnrollmentError, "record_incomplete"):
+            extract_g0401(g0401_image(19, 20, omit_newest=(0xE20,)), DOOR)
+
     def test_050_reuses_preserved_parser(self):
         result = extract_050dctwf(image_050(), DOOR)
         self.assertEqual(
@@ -96,8 +106,11 @@ class EnrollmentTests(unittest.TestCase):
     def test_cli_writes_owner_only_file_without_secret_output(self):
         with tempfile.TemporaryDirectory() as tmp:
             image = Path(tmp) / "image.bin"
+            door_id = Path(tmp) / "door-id"
             output = Path(tmp) / "enrollment.json"
             image.write_bytes(g0401_image())
+            door_id.write_text(DOOR.hex())
+            door_id.chmod(0o600)
             stdout, stderr = StringIO(), StringIO()
             with redirect_stdout(stdout), redirect_stderr(stderr):
                 code = main(
@@ -107,8 +120,8 @@ class EnrollmentTests(unittest.TestCase):
                         "MYQ-G0401-ES",
                         "--image",
                         str(image),
-                        "--door-id",
-                        DOOR.hex(),
+                        "--door-id-file",
+                        str(door_id),
                         "--output",
                         str(output),
                     ]
@@ -126,7 +139,9 @@ class EnrollmentTests(unittest.TestCase):
     def test_050_bundle_uses_community_configuration_names(self):
         result = json.loads(extract_050dctwf(image_050(), DOOR).payload())
         self.assertEqual(result["serial"], IDENTITY.decode())
+        self.assertEqual(result["device_id"], DOOR.hex())
         self.assertNotIn("identity", result)
+        self.assertNotIn("door_id", result)
 
 
 if __name__ == "__main__":

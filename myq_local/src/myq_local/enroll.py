@@ -7,6 +7,7 @@ import importlib.util
 import json
 import os
 import re
+import stat
 import struct
 import sys
 from dataclasses import dataclass
@@ -34,7 +35,9 @@ class Credentials:
                     "model": self.model,
                     identity_name: self.identity.decode("ascii"),
                     "psk": self.psk.hex(),
-                    "door_id": self.door_id.hex(),
+                    (
+                        "device_id" if self.model == "050DCTWF" else "door_id"
+                    ): self.door_id.hex(),
                 },
                 indent=2,
             )
@@ -70,13 +73,43 @@ def load_community_tools() -> tuple[ModuleType, ModuleType]:
     return fwtool, psmtool
 
 
-def _door_id(value: str) -> bytes:
+def _private_value(path: Path) -> str:
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+    try:
+        info = os.fstat(fd)
+        if (
+            not stat.S_ISREG(info.st_mode)
+            or info.st_uid != os.getuid()
+            or stat.S_IMODE(info.st_mode) != 0o600
+        ):
+            raise EnrollmentError("private_input_requires_owner_only_file")
+        return os.read(fd, 128).decode("ascii").strip()
+    finally:
+        os.close(fd)
+
+
+def _door_id(value: str, model: str) -> bytes:
     if not re.fullmatch(r"[0-9a-fA-F]{12}", value):
         raise EnrollmentError("door_id_requires_12_hex_characters")
     result = bytes.fromhex(value)
-    if result[0] != 0x84:
+    if model == "MYQ-G0401-ES" and result[0] != 0x84:
         raise EnrollmentError("door_id_does_not_match_supported_sensor_family")
     return result
+
+
+def _newest_sequence(pages: list[tuple[int, int, int]]) -> tuple[int, int, int]:
+    if len(pages) == 1:
+        return pages[0]
+    candidates = []
+    for candidate in pages:
+        if all(
+            candidate is other or 1 <= ((candidate[0] - other[0]) & 0xFF) <= 127
+            for other in pages
+        ):
+            candidates.append(candidate)
+    if len(candidates) != 1:
+        raise EnrollmentError("g0401_append_log_generation_ambiguous")
+    return candidates[0]
 
 
 def extract_g0401(data: bytes, door_id: bytes) -> Credentials:
@@ -95,18 +128,18 @@ def extract_g0401(data: bytes, door_id: bytes) -> Credentials:
     sequences = [row[0] for row in pages]
     if len(sequences) != len(set(sequences)):
         raise EnrollmentError("g0401_append_log_generation_ambiguous")
+    _sequence, limit, offset = _newest_sequence(pages)
     locations: dict[int, int] = {}
-    for _sequence, limit, offset in sorted(pages, reverse=True):
-        words = struct.unpack_from("<1024I", data, offset)
-        end = max((i for i, word in enumerate(words) if word != 0xFFFFFFFF), default=1)
-        if limit >> 31 == 0:
-            end = min(end, (limit & 0xFFFF) - 1)
-        for index in range(end if end % 2 else end - 1, 2, -2):
-            header = words[index]
-            logical = header & 0xFFFF
-            kind = header >> 16 & 0xFF
-            if header >> 31 == 0 and kind == 1 and logical % 4 == 0 and logical < 4096:
-                locations.setdefault(logical, offset + (index - 1) * 4)
+    words = struct.unpack_from("<1024I", data, offset)
+    end = max((i for i, word in enumerate(words) if word != 0xFFFFFFFF), default=1)
+    if limit >> 31 == 0:
+        end = min(end, (limit & 0xFFFF) - 1)
+    for index in range(end if end % 2 else end - 1, 2, -2):
+        header = words[index]
+        logical = header & 0xFFFF
+        kind = header >> 16 & 0xFF
+        if header >> 31 == 0 and kind == 1 and logical % 4 == 0 and logical < 4096:
+            locations.setdefault(logical, offset + (index - 1) * 4)
     try:
         identity = b"".join(
             data[locations[x] : locations[x] + 4] for x in range(0xE08, 0xE14, 4)
@@ -130,7 +163,18 @@ def extract_050dctwf(data: bytes, door_id: bytes) -> Credentials:
     tables = fwtool.find_partition_tables(data)
     if not tables:
         raise EnrollmentError("050dctwf_partition_table_not_found")
-    table = max(tables, key=lambda item: item.generation)
+    generation = max(table.generation for table in tables)
+    newest_tables = [table for table in tables if table.generation == generation]
+    signatures = {
+        tuple(
+            (entry.name, entry.start, entry.size, entry.generation)
+            for entry in table.entries
+        )
+        for table in newest_tables
+    }
+    if len(signatures) != 1:
+        raise EnrollmentError("050dctwf_partition_table_generation_ambiguous")
+    table = newest_tables[0]
     partitions = [entry for entry in table.entries if entry.name == "psm_seed"]
     if len(partitions) != 1:
         raise EnrollmentError("050dctwf_psm_seed_partition_ambiguous")
@@ -157,6 +201,7 @@ def write_private(path: Path, payload: bytes) -> None:
     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
     fd = os.open(path, flags, 0o600)
     try:
+        os.fchmod(fd, 0o600)
         with os.fdopen(fd, "wb") as stream:
             stream.write(payload)
             stream.flush()
@@ -175,7 +220,7 @@ def _parser() -> argparse.ArgumentParser:
     )
     extract.add_argument("--model", required=True, choices=("MYQ-G0401-ES", "050DCTWF"))
     extract.add_argument("--image", required=True, type=Path)
-    extract.add_argument("--door-id", required=True)
+    extract.add_argument("--door-id-file", required=True, type=Path)
     extract.add_argument("--output", required=True, type=Path)
     return parser
 
@@ -192,7 +237,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     try:
         data = args.image.read_bytes()
-        door_id = _door_id(args.door_id)
+        door_id = _door_id(_private_value(args.door_id_file), args.model)
         credentials = (
             extract_g0401(data, door_id)
             if args.model == "MYQ-G0401-ES"
