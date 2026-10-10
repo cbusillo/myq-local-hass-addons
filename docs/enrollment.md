@@ -82,3 +82,31 @@ Unresolved release work:
 Until those pass, this is an expert-assisted experimental installation, not a
 general no-programmer onboarding solution. Ordinary runtime needs only the
 bundle; it neither reads hardware nor uploads firmware to a service.
+
+## Combined assistant boundary
+
+`myq-enroll` is the common entry point for the repository's two hardware
+profiles. It currently performs offline extraction from an owner-supplied local
+image:
+
+| Profile | Acquisition input | Parser | Support |
+|---|---|---|---|
+| MYQ-G0401-ES | Exact 8 MiB mapped AP1 image | Realtek append-log selection plus the audited key unwrap | Maintained |
+| 050DCTWF | Exact 4 MiB or 8 MiB SPI image | Preserved StanleyCA WMPT/PSMv2 parser and key unwrap | Community |
+
+The assistant requires an explicit model and refuses size, partition, record,
+identity, or sensor-family mismatches. It never chooses a hardware profile from
+ambiguous probe output. Output uses a newly created owner-only file and is never
+printed.
+
+Direct G0401 programmer control is deliberately absent from this first stage.
+The retained reader has bounded identity and address guards, but publishing a
+hardware command requires the removable fixture, voltage and orientation
+preflight, stop procedure, and another owner-observed run. The 050DCTWF profile
+likewise imports a dump rather than controlling a CH341 programmer. Its
+`door_id` remains a separate decrypted-traffic result.
+
+The G0401 output is accepted by the root app's enrollment importer. The
+050DCTWF output instead names the community app's `serial`, `psk`, and
+`door_id` configuration fields. The two runtime apps are still
+hardware-specific even though enrollment begins with one command.
