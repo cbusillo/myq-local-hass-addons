@@ -14,6 +14,11 @@ to match its upstream foundation.
   (firmware 1.10) — and its runtime was re-implemented for that hardware rather
   than copied, but it would not exist without StanleyCA's work and documentation.
 
+  With StanleyCA's permission, the source project's public 050DCTWF materials
+  are also preserved in [`community/050dctwf`](community/050dctwf/README.md).
+  [`SOURCE.md`](community/050dctwf/SOURCE.md) records the exact imported commit
+  and which files remain an upstream snapshot.
+
 ## Additional research consulted
 
 - **[fuxxociety/MyQ-ESP-transplant](https://github.com/fuxxociety/MyQ-ESP-transplant)**

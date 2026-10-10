@@ -1,13 +1,26 @@
 # myQ Local
 
-Experimental local control of a **stock MYQ-G0401-ES hub, firmware 1.10**, with
-an HBW9546 door sensor. A Home Assistant app terminates the hub's per-device
-TLS-PSK connection and presents an MQTT garage-door cover through your existing
-broker. No replacement broker or firmware flashing is involved.
+Local Home Assistant bridges and research for supported myQ hardware. Start by
+identifying the hardware and firmware you have because the enrollment and
+protocol details are different.
 
-The protocol was validated with an owner-observed local open/close cycle and
-matching sensor reports on one specimen. The packaged app is a separate
-validation target. Other hardware and firmware versions are not qualified.
+| Hardware | Firmware | Project status | Start here |
+| --- | --- | --- | --- |
+| **MYQ-G0401-ES hub** with HBW9546 sensor | **1.10** | Current maintained target. The packaged app has passed an owner-observed Home Assistant open/close cycle on one specimen. | Continue with this README and the [enrollment guide](docs/enrollment.md). |
+| **050DCTWF logic board** | **3.13** | Community reference imported from StanleyCA's tested project. The current maintainer does not own this hardware and cannot qualify changes on it yet. | Read the [050DCTWF community package](community/050dctwf/README.md). |
+
+See [hardware support](docs/hardware-support.md) for the support boundary and
+help identifying the applicable path.
+
+The root Home Assistant app targets the **stock MYQ-G0401-ES hub, firmware
+1.10**, with an HBW9546 door sensor. It terminates the hub's per-device TLS-PSK
+connection and presents an MQTT garage-door cover through your existing broker.
+No replacement broker or firmware flashing is involved.
+
+The packaged app was validated with one explicit Home Assistant open request,
+one explicit close request, owner-observed full-open and closed positions, and
+matching sensor reports on one specimen. Other hardware and firmware versions
+are not qualified by the current maintainer.
 
 ## Installation
 
@@ -109,8 +122,8 @@ This project is **AGPL-3.0-or-later**. Its design is adapted from
 [StanleyCA/MyQ-Security2.0-HomeAssistant](https://github.com/StanleyCA/MyQ-Security2.0-HomeAssistant)
 (AGPL-3.0), a local myQ bridge for the 050DCTWF logic board; this project adapts
 that approach to the stock MYQ-G0401-ES hub and re-implements the runtime for
-that hardware. See [CREDITS.md](CREDITS.md) for full attribution, including the
-additional research consulted. The AGPL firmware/capture research tools used
-during discovery are not included in this runtime package. myQ and Chamberlain
-are trademarks of the Chamberlain Group; this project is not affiliated with
-Chamberlain Group.
+that hardware. StanleyCA's public 050DCTWF project is preserved under
+[`community/050dctwf`](community/050dctwf/README.md) at a pinned source commit.
+See [CREDITS.md](CREDITS.md) for full attribution, including the additional
+research consulted. myQ and Chamberlain are trademarks of the Chamberlain
+Group; this project is not affiliated with Chamberlain Group.

@@ -27,5 +27,15 @@ viewport and HA ingress acceptance remain separate checks.
 JetBrains inspection returned UNKNOWN / project_analysis_not_ready after its
 internal retry budget. No clean IDE result is claimed.
 
-Live installation and owner-observed acceptance belong in private local
-operations evidence. No public repository or release has been published.
+## Installed acceptance
+
+The packaged app passed an owner-observed Home Assistant test on one
+MYQ-G0401-ES running firmware 1.10: exactly one open request and one close
+request, physical full-open and closed confirmations, and corresponding Home
+Assistant state reports. A restart also recovered fresh closed-state telemetry
+without sending a motion command. The existing Home Assistant MQTT broker and
+HomeKit exposure remained in use.
+
+That acceptance does not qualify other hardware or firmware, prolonged service
+stability, a fresh installation by another owner, or the still-unpackaged
+credential-acquisition workflow.
