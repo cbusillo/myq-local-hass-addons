@@ -19,3 +19,8 @@ packages = ["myq_local/src/myq_local"]
 
 [dependency-groups]
 dev = ["ruff>=0.14,<1", "pyyaml>=6,<7"]
+
+[tool.ruff]
+# The community package is a pinned upstream snapshot with its own build and
+# validation instructions. Keep root formatting from rewriting its provenance.
+extend-exclude = ["community/050dctwf"]

@@ -30,9 +30,10 @@ no battery percentage, fault status, or stop action is inferred.
 
 The first field test validated two explicit local motion requests, matching
 state transitions `2 → 9 → 2`, and owner observation. It used a bounded
-temporary router transaction, with independent rollback verification. It did
-not validate an installed Home Assistant app, prolonged service stability,
-additional units, or programmer-free enrollment.
+temporary router transaction, with independent rollback verification. A later
+installed Home Assistant app test validated one explicit open and one explicit
+close with matching physical and reported states. Neither test establishes
+prolonged service stability, additional units, or programmer-free enrollment.
 
 The package tests validate exact bytes, binding despite inventory reorder,
 freshness, duplicate/pending requests, stream fragmentation, and queued-command

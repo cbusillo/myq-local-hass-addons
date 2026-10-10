@@ -1,0 +1,8 @@
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Protocol documentation uses the phrase PSK key exchange"
+regexTarget = "match"
+regexes = ['''plain PSK key exchange''']
+paths = ['''community/050dctwf/analysis/decrypt_tls_psk_pcap\.py''']
