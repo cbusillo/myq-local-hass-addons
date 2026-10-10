@@ -14,6 +14,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType
 
+from myq_local.acquire import AcquisitionError, acquire_g0401_pages
+
 
 class EnrollmentError(ValueError):
     """The input cannot be turned into an unambiguous enrollment result."""
@@ -112,14 +114,13 @@ def _newest_sequence(pages: list[tuple[int, int, int]]) -> tuple[int, int, int]:
     return candidates[0]
 
 
-def extract_g0401(data: bytes, door_id: bytes) -> Credentials:
-    if len(data) != 8 * 1024 * 1024:
-        raise EnrollmentError("g0401_image_must_be_exactly_8_mib")
+def extract_g0401_region(data: bytes, door_id: bytes) -> Credentials:
+    if len(data) != 3 * 4096:
+        raise EnrollmentError("g0401_region_must_contain_three_pages")
     _, psmtool = load_community_tools()
-    base = 0x202000
     pages = []
     for page in range(3):
-        offset = base + page * 4096
+        offset = page * 4096
         header, limit = struct.unpack_from("<II", data, offset)
         if header & 0xFFFF == 0x635E and header >> 31 == 0:
             pages.append((header >> 16 & 0xFF, limit, offset))
@@ -154,6 +155,12 @@ def extract_g0401(data: bytes, door_id: bytes) -> Credentials:
     return Credentials(
         "MYQ-G0401-ES", identity, psmtool.unwrap_myq_aes(wrapped), door_id
     )
+
+
+def extract_g0401(data: bytes, door_id: bytes) -> Credentials:
+    if len(data) != 8 * 1024 * 1024:
+        raise EnrollmentError("g0401_image_must_be_exactly_8_mib")
+    return extract_g0401_region(data[0x202000:0x205000], door_id)
 
 
 def extract_050dctwf(data: bytes, door_id: bytes) -> Credentials:
@@ -196,18 +203,44 @@ def extract_050dctwf(data: bytes, door_id: bytes) -> Credentials:
     return Credentials("050DCTWF", identity, psk, door_id)
 
 
-def write_private(path: Path, payload: bytes) -> None:
+def reserve_private(path: Path) -> int:
     path.parent.mkdir(parents=True, exist_ok=True)
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
     fd = os.open(path, flags, 0o600)
     try:
         os.fchmod(fd, 0o600)
-        with os.fdopen(fd, "wb") as stream:
-            stream.write(payload)
-            stream.flush()
-            os.fsync(stream.fileno())
     except BaseException:
+        abort_private(path, fd)
+        raise
+    return fd
+
+
+def finish_private(fd: int, payload: bytes) -> None:
+    view = memoryview(payload)
+    while view:
+        written = os.write(fd, view)
+        if written <= 0:
+            raise OSError("private_output_write_failed")
+        view = view[written:]
+    os.fsync(fd)
+    os.close(fd)
+
+
+def abort_private(path: Path, fd: int) -> None:
+    try:
+        os.close(fd)
+    except OSError:
+        pass
+    finally:
         path.unlink(missing_ok=True)
+
+
+def write_private(path: Path, payload: bytes) -> None:
+    fd = reserve_private(path)
+    try:
+        finish_private(fd, payload)
+    except BaseException:
+        abort_private(path, fd)
         raise
 
 
@@ -222,6 +255,14 @@ def _parser() -> argparse.ArgumentParser:
     extract.add_argument("--image", required=True, type=Path)
     extract.add_argument("--door-id-file", required=True, type=Path)
     extract.add_argument("--output", required=True, type=Path)
+    acquire = sub.add_parser(
+        "acquire", help="read G0401 enrollment directly through an ST-Link/V2"
+    )
+    acquire.add_argument("--model", required=True, choices=("MYQ-G0401-ES",))
+    acquire.add_argument("--firmware", required=True, choices=("1.10",))
+    acquire.add_argument("--door-id-file", required=True, type=Path)
+    acquire.add_argument("--output", required=True, type=Path)
+    acquire.add_argument("--openocd", type=Path)
     return parser
 
 
@@ -229,24 +270,66 @@ def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     if args.command == "profiles":
         print(
-            "MYQ-G0401-ES  maintained  ST-Link/SWD mapped read; direct acquisition remains gated"
+            "MYQ-G0401-ES  maintained  guided ST-Link/SWD credential-page acquisition"
         )
         print(
             "050DCTWF       community   CH341/SPI image; this tool imports an existing verified dump"
         )
         return 0
     try:
-        data = args.image.read_bytes()
         door_id = _door_id(_private_value(args.door_id_file), args.model)
+        if args.command == "acquire":
+            output_fd = reserve_private(args.output)
+            try:
+                print(
+                    "Connect only ST-Link/V2 GND to J3 pin 3, SWDIO to pin 2, "
+                    "and SWCLK to pin 4. Power the hub with its normal adapter. "
+                    "Leave J3 pin 1, reset, SWIM, 3.3 V, and 5 V disconnected."
+                )
+                print(
+                    "The reader performs one preflight and two reads of each of "
+                    "three credential pages. It never resets, halts, or writes "
+                    "target memory."
+                )
+                try:
+                    confirmation = input("Type READY to begin: ")
+                except EOFError as error:
+                    raise EnrollmentError(
+                        "fixture_confirmation_not_received"
+                    ) from error
+                if confirmation != "READY":
+                    raise EnrollmentError("fixture_confirmation_not_received")
+                region, voltage = acquire_g0401_pages(args.openocd)
+                credentials = extract_g0401_region(region, door_id)
+                finish_private(output_fd, credentials.payload())
+            except BaseException:
+                abort_private(args.output, output_fd)
+                raise
+            print(
+                f"Connection verified at {voltage:.2f} V. Enrollment written "
+                "privately for MYQ-G0401-ES after six matching page reads: "
+                f"{args.output}"
+            )
+            return 0
+        data = args.image.read_bytes()
         credentials = (
             extract_g0401(data, door_id)
             if args.model == "MYQ-G0401-ES"
             else extract_050dctwf(data, door_id)
         )
         write_private(args.output, credentials.payload())
-    except (EnrollmentError, OSError, ValueError, struct.error) as error:
+    except (
+        AcquisitionError,
+        EnrollmentError,
+        OSError,
+        ValueError,
+        struct.error,
+    ) as error:
         print(f"Enrollment stopped: {error}", file=sys.stderr)
         return 2
+    except KeyboardInterrupt:
+        print("Enrollment stopped by user; no automatic retry.", file=sys.stderr)
+        return 130
     noun = (
         "Community credential bundle"
         if credentials.model == "050DCTWF"

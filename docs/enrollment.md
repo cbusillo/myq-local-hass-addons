@@ -1,7 +1,6 @@
 # Enrollment status
 
-This version imports an already prepared private enrollment bundle. Its format
-is:
+This version can create or import a private enrollment bundle. Its format is:
 
 ```json
 {
@@ -34,8 +33,13 @@ Realtek device through its SWD debug port. It read the mapped AP1 window from
 Every chunk was read twice and both copies matched. The process did not halt or
 reset the CPU and did not erase, program, unlock, or write target memory.
 
-That result establishes a read-only acquisition method for this specimen, but
-it is not yet a general installation recipe:
+That result established the read-only acquisition method. A later
+owner-observed run showed that enrollment needs only the three append-log pages
+from mapped offsets `0x202000` through `0x204fff`. All three pages were captured
+twice, parsed successfully, and produced the same identity and PSK already
+accepted by the installed app.
+
+The remaining limits are:
 
 - The public documentation does not yet identify and photograph a repeatable
   connector or test-point fixture.
@@ -43,14 +47,12 @@ it is not yet a general installation recipe:
   or decryption. It must not be advertised as a raw or restorable SPI backup.
 - The CPU continued running, so matching sequential reads do not make the image
   an atomic snapshot.
-- The current reader and credential parser still need to be reduced to a
-  bounded, reviewed tool that emits only the enrollment bundle and verification
-  results.
+- The physical fixture has been proven on one specimen but still needs another
+  owner to reproduce it before the workflow is described as broadly qualified.
 
-Until those pieces exist and pass a second owner-observed acquisition, do not
-publish copy-and-paste debug commands or ask users to improvise wiring. A failed
-read should stop without automatically increasing voltage, changing clock
-speed, retrying destructive operations, or writing anything to the hub.
+The packaged command includes the exact wiring, identity, voltage, address, and
+stop guards. A failed read stops without automatically changing voltage or
+clock speed, retrying, or writing anything to the hub.
 
 ## Intended guided workflow
 
@@ -71,11 +73,9 @@ The next supported installer should:
 The firmware image and enrollment bundle remain on the owner's computer. This
 project does not need to receive or redistribute either one.
 
-Unresolved release work:
+Remaining qualification work:
 
 - Reproduce the read on another MYQ-G0401-ES and document a removable fixture.
-- Package bounded acquisition and image-record discovery without relying only
-  on specimen-specific offsets or metadata.
 - Provide a sensor-binding wizard with controls disabled while identifying it.
 - Validate any hardware-free candidate before promising wireless-only setup.
 
@@ -86,12 +86,11 @@ bundle; it neither reads hardware nor uploads firmware to a service.
 ## Combined assistant boundary
 
 `myq-enroll` is the common entry point for the repository's two hardware
-profiles. It currently performs offline extraction from an owner-supplied local
-image:
+profiles:
 
 | Profile | Acquisition input | Parser | Support |
 |---|---|---|---|
-| MYQ-G0401-ES firmware 1.10 | Exact 8 MiB mapped AP1 image | Specimen-derived Realtek append-log selection plus the audited key unwrap | Maintained experimental |
+| MYQ-G0401-ES firmware 1.10 | Guided ST-Link read of three mapped pages, or an existing exact 8 MiB mapped image | Realtek append-log selection plus the audited key unwrap | Maintained experimental |
 | 050DCTWF | Exact 4 MiB or 8 MiB SPI image | Preserved StanleyCA WMPT/PSMv2 parser and key unwrap | Community |
 
 The assistant requires an explicit model and refuses size, partition, record,
@@ -99,12 +98,12 @@ identity, or sensor-family mismatches. It never chooses a hardware profile from
 ambiguous probe output. Output uses a newly created owner-only file and is never
 printed.
 
-Direct G0401 programmer control is deliberately absent from this first stage.
-Private validation evidence includes bounded identity and address guards, but publishing a
-hardware command requires the removable fixture, voltage and orientation
-preflight, stop procedure, and another owner-observed run. The 050DCTWF profile
-likewise imports a dump rather than controlling a CH341 programmer. Its
-`door_id` remains a separate decrypted-traffic result.
+The G0401 profile includes bounded ST-Link/V2 acquisition for the three required
+pages. It requires the user to confirm the exact model and firmware, checks
+voltage plus DP/AP identities, and performs two independent reads of every page. It creates no
+firmware image and stops without an output on a disconnect or mismatch. The
+050DCTWF profile still imports a dump rather than controlling a CH341
+programmer. Its `device_id` remains a separate decrypted-traffic result.
 
 The G0401 output is accepted by the root app's enrollment importer. The
 050DCTWF output instead names the community app's `serial`, `psk`, and

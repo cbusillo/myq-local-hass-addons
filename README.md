@@ -62,9 +62,10 @@ per-device credentials. A hardware-free enrollment path has not been found;
 this is not proof that one is impossible. Once the enrollment file is imported,
 ordinary operation does not use a programmer or firmware image.
 
-The first package imports an expert-prepared bundle. A reproducible guided
-acquisition and sensor-binding wizard for other owners is still needed before
-claiming a consumer-ready installation. See [enrollment](docs/enrollment.md).
+The guided G0401 command performs the one-time credential read and creates the
+private bundle locally. A sensor-binding wizard and reproduction by another
+owner are still needed before claiming a consumer-ready installation. See
+[enrollment](docs/enrollment.md).
 
 Keep enrollment private. It contains the device identity, TLS PSK, and paired
 door identifier. Never publish it, a raw firmware image, or an unredacted
@@ -76,10 +77,9 @@ or diagnostics. App data and Home Assistant backups may contain the key.
 Run `uv run myq-enroll profiles` to identify the applicable enrollment path.
 The assistant keeps the hardware-specific steps behind one command:
 
-- `MYQ-G0401-ES` is the maintained profile. The current command can extract
-  an enrollment bundle from an already acquired 8 MiB mapped image. Direct
-  ST-Link acquisition remains gated until the removable fixture and complete
-  preflight are documented and owner-observed.
+- `MYQ-G0401-ES` is the maintained profile. It can acquire the three required
+  credential pages directly through an ST-Link/V2 or extract from an existing
+  8 MiB mapped image.
 - `050DCTWF` is a community profile. It accepts an existing verified 4 MiB or
   8 MiB SPI dump and reuses StanleyCA's preserved PSM parser. Hardware
   acquisition remains covered by the community flash guide.
@@ -105,6 +105,27 @@ the community app's configuration, rather than an import for the root G0401
 app. The door-ID file must contain only the twelve hexadecimal characters and
 have owner-only permissions (`0600`); this keeps the identifier out of shell
 history and process listings.
+
+For a stock MYQ-G0401-ES running firmware 1.10, install OpenOCD 0.12.0 and
+connect only ST-Link/V2 GND to J3 pin 3, SWDIO to pin 2, and SWCLK to pin 4. Power
+the hub from its normal adapter. Leave J3 pin 1, reset, SWIM, 3.3 V, and 5 V
+disconnected. Then run:
+
+```sh
+uv run myq-enroll acquire \
+  --model MYQ-G0401-ES \
+  --firmware 1.10 \
+  --door-id-file /private/path/to/door-id.txt \
+  --output /private/path/to/enrollment.json
+```
+
+Read the displayed wiring check and type `READY` only after the contacts are
+stable. The command checks target voltage and the known debug identities, then
+reads each of the three credential pages twice. Any disconnect, incomplete
+page, identity change, or byte mismatch stops the run without retrying or
+creating the output. It does not reset or halt the CPU, write target memory,
+or save firmware bytes. After a successful result, power down the hub before
+removing the fixture.
 
 ## State and command behavior
 
