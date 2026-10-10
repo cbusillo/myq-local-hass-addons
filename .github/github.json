@@ -1,0 +1,19 @@
+{
+  "defaultBranch": "main",
+  "projectType": "python-home-assistant-app",
+  "qualityGate": {
+    "inspection": {
+      "ide": "PyCharm",
+      "scopePreference": ["changed_files", "whole_project"],
+      "prepare": {
+        "python": {
+          "version": "3.13",
+          "moduleName": "myq-local-ha",
+          "testRoots": ["tests"],
+          "sync": true,
+          "requiredGeneratedState": [".venv", ".idea"]
+        }
+      }
+    }
+  }
+}
