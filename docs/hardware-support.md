@@ -9,14 +9,16 @@ firmware before following any hardware instructions.
 - Qualified firmware: **1.10**
 - Typical paired sensor in this project: **HBW9546**
 - Status: maintained here
-- Runtime: the root [`myq_local`](../myq_local/) Home Assistant app
+- Runtime: the root [`myq_local`](../myq_local/config.yaml) Home Assistant app
 - Enrollment: one-time hardware read of the device identity, TLS PSK, and
   paired door identifier; ordinary use does not require a programmer or
   modified firmware
 
 The packaged app passed an owner-observed Home Assistant open/close cycle on one
-specimen, and its source and isolated package tests pass. A repeatable
-credential-acquisition guide remains before this is a consumer-ready path.
+specimen, and the guided three-page credential acquisition succeeded on that
+same specimen. Its source and isolated package tests pass. A photographed,
+removable fixture and reproduction by another owner remain before this is a
+consumer-ready path.
 
 ## 050DCTWF logic board
 
