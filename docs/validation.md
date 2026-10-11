@@ -62,7 +62,9 @@ sends no motion command and that Home Assistant discovery exposes no open or
 close payload while the profile is unbound. After an app restart, the completed
 schema-1 profile passes the existing state and explicit-command cycles.
 
-Multiple-candidate tests require an observed state transition before a candidate
-can be confirmed, preserve candidate labels across inventory reordering, and
-never return raw device identifiers through the setup status endpoint. These
-tests do not replace an owner-observed run against the installed hub.
+Multiple-candidate tests require fresh baselines and exactly one state transition
+after the owner starts identification. They reject an ambiguous two-sensor
+change, reset the observation window on request, preserve candidate labels
+across inventory reordering, and never return raw device identifiers through
+the setup status endpoint. These tests do not replace an owner-observed run
+against the installed hub.

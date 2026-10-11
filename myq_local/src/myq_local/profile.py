@@ -1,5 +1,6 @@
 """Private enrollment storage; credentials never enter diagnostics or argv."""
 
+import hmac
 import json
 import os
 import re
@@ -122,22 +123,47 @@ class EnrollmentState:
         self.candidates = ()
         self.tokens = {}
         self.states = {}
-        self.changes = {}
+        self.changed = set()
+        self.identifying = False
+        self.inventory_seen = False
+        self.candidate_identity = None
 
-    def record_inventory(self, identifiers: tuple[bytes, ...]) -> None:
+    def _clear_binding_state(self) -> None:
+        self.candidates = ()
+        self.tokens = {}
+        self.states = {}
+        self.changed = set()
+        self.identifying = False
+        self.inventory_seen = False
+        self.candidate_identity = None
+
+    def replace(self, payload: bytes) -> None:
+        with self.lock:
+            save_profile(self.path, payload)
+            self._clear_binding_state()
+
+    def record_inventory(self, identity: bytes, identifiers: tuple[bytes, ...]) -> None:
         compatible = tuple(sorted(value for value in identifiers if value[0] == 0x84))
         with self.lock:
             profile = Profile.load(self.path)
             if profile.bound:
                 return
+            if not hmac.compare_digest(profile.identity, identity):
+                self._clear_binding_state()
+                return
+            same_inventory = compatible == self.candidates
             old_tokens = self.tokens
             self.candidates = compatible
+            self.inventory_seen = True
+            self.candidate_identity = identity
             self.tokens = {
                 value: old_tokens.get(value, secrets.token_urlsafe(18))
                 for value in compatible
             }
             self.states = {value: self.states.get(value) for value in compatible}
-            self.changes = {value: self.changes.get(value, 0) for value in compatible}
+            if not same_inventory:
+                self.changed = set()
+                self.identifying = False
 
     def record_state(self, identifier: bytes, state: int) -> None:
         if state not in (2, 9):
@@ -146,14 +172,30 @@ class EnrollmentState:
             if identifier not in self.tokens:
                 return
             previous = self.states.get(identifier)
-            if previous is not None and previous != state:
-                self.changes[identifier] += 1
+            if self.identifying and previous is not None and previous != state:
+                self.changed.add(identifier)
             self.states[identifier] = state
+
+    def start_identification(self) -> None:
+        with self.lock:
+            if len(self.candidates) <= 1 or any(
+                self.states.get(identifier) is None for identifier in self.candidates
+            ):
+                raise InvalidProfile("sensor_baseline_unavailable")
+            self.changed = set()
+            self.identifying = True
 
     def status(self) -> dict[str, object]:
         with self.lock:
             if not self.path.exists():
-                return {"enrolled": False, "bound": False, "candidates": []}
+                return {
+                    "enrolled": False,
+                    "bound": False,
+                    "inventory_seen": False,
+                    "identifying": False,
+                    "ambiguous": False,
+                    "candidates": [],
+                }
             profile = Profile.load(self.path)
             rows = []
             if not profile.bound:
@@ -170,12 +212,15 @@ class EnrollmentState:
                                 if state == 9
                                 else "waiting"
                             ),
-                            "changes": self.changes.get(identifier, 0),
+                            "changed": identifier in self.changed,
                         }
                     )
             return {
                 "enrolled": True,
                 "bound": profile.bound,
+                "inventory_seen": self.inventory_seen,
+                "identifying": self.identifying,
+                "ambiguous": len(self.changed) > 1,
                 "candidates": rows,
             }
 
@@ -189,9 +234,15 @@ class EnrollmentState:
             if len(matches) != 1:
                 raise InvalidProfile("unknown_sensor_candidate")
             identifier = matches[0]
-            if len(self.candidates) > 1 and self.changes.get(identifier, 0) == 0:
-                raise InvalidProfile("sensor_identification_required")
             profile = Profile.load(self.path)
             if profile.bound:
                 raise InvalidProfile("profile_already_bound")
+            if self.candidate_identity is None or not hmac.compare_digest(
+                profile.identity, self.candidate_identity
+            ):
+                raise InvalidProfile("binding_identity_changed")
+            if len(self.candidates) > 1 and (
+                not self.identifying or self.changed != {identifier}
+            ):
+                raise InvalidProfile("sensor_identification_required")
             save_profile(self.path, profile.bind(identifier).payload())

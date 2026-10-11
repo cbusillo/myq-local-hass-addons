@@ -94,12 +94,12 @@ class ProfileTests(unittest.TestCase):
             save_profile(path, UNBOUND_BUNDLE)
             self.assertFalse(Profile.load(path).bound)
             enrollment = EnrollmentState(path)
-            enrollment.record_inventory((DOOR, other))
+            enrollment.record_inventory(IDENTITY, (DOOR, other))
             initial = enrollment.status()
             self.assertFalse(initial["bound"])
             self.assertEqual(len(initial["candidates"]), 2)
             self.assertNotIn(DOOR.hex(), json.dumps(initial))
-            enrollment.record_inventory((other, DOOR))
+            enrollment.record_inventory(IDENTITY, (other, DOOR))
             reordered = enrollment.status()
             self.assertEqual(
                 [row["token"] for row in reordered["candidates"]],
@@ -108,9 +108,11 @@ class ProfileTests(unittest.TestCase):
             with self.assertRaisesRegex(InvalidProfile, "identification_required"):
                 enrollment.bind(initial["candidates"][0]["token"])
             enrollment.record_state(DOOR, 2)
+            enrollment.record_state(other, 2)
+            enrollment.start_identification()
             enrollment.record_state(DOOR, 9)
             changed = enrollment.status()["candidates"][0]
-            self.assertEqual(changed["changes"], 1)
+            self.assertTrue(changed["changed"])
             enrollment.bind(changed["token"])
             self.assertEqual(Profile.load(path).door_id, DOOR)
             self.assertEqual(os.stat(path).st_mode & 0o777, 0o600)
@@ -120,10 +122,55 @@ class ProfileTests(unittest.TestCase):
             path = Path(tmp) / "enrollment.json"
             save_profile(path, UNBOUND_BUNDLE)
             enrollment = EnrollmentState(path)
-            enrollment.record_inventory((b"\x01abcde", DOOR))
+            enrollment.record_inventory(IDENTITY, (b"\x01abcde", DOOR))
             candidate = enrollment.status()["candidates"][0]
             enrollment.bind(candidate["token"])
             self.assertEqual(Profile.load(path).door_id, DOOR)
+
+    def test_replacing_enrollment_clears_authenticated_candidates(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "enrollment.json"
+            save_profile(path, UNBOUND_BUNDLE)
+            enrollment = EnrollmentState(path)
+            enrollment.record_inventory(IDENTITY, (DOOR,))
+            old_token = enrollment.status()["candidates"][0]["token"]
+            replacement = json.loads(UNBOUND_BUNDLE)
+            replacement["identity"] = "BB12345678"
+            enrollment.replace(json.dumps(replacement).encode())
+            self.assertEqual(enrollment.status()["candidates"], [])
+            with self.assertRaisesRegex(InvalidProfile, "unknown_sensor_candidate"):
+                enrollment.bind(old_token)
+
+    def test_inventory_without_a_compatible_sensor_is_reported(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "enrollment.json"
+            save_profile(path, UNBOUND_BUNDLE)
+            enrollment = EnrollmentState(path)
+            enrollment.record_inventory(IDENTITY, (b"\x01abcde",))
+            status_row = enrollment.status()
+            self.assertTrue(status_row["inventory_seen"])
+            self.assertEqual(status_row["candidates"], [])
+
+    def test_multiple_changed_sensors_are_ambiguous_until_restarted(self):
+        other = bytes.fromhex("84abcdef1200")
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "enrollment.json"
+            save_profile(path, UNBOUND_BUNDLE)
+            enrollment = EnrollmentState(path)
+            enrollment.record_inventory(IDENTITY, (DOOR, other))
+            enrollment.record_state(DOOR, 2)
+            enrollment.record_state(other, 2)
+            enrollment.start_identification()
+            enrollment.record_state(DOOR, 9)
+            enrollment.record_state(other, 9)
+            status_row = enrollment.status()
+            self.assertTrue(status_row["ambiguous"])
+            with self.assertRaisesRegex(InvalidProfile, "identification_required"):
+                enrollment.bind(status_row["candidates"][0]["token"])
+            enrollment.start_identification()
+            reset = enrollment.status()
+            self.assertFalse(reset["ambiguous"])
+            self.assertFalse(any(row["changed"] for row in reset["candidates"]))
 
 
 class ProtocolTests(unittest.TestCase):

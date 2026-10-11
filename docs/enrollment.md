@@ -19,8 +19,9 @@ bound schema-1 files remain accepted.
 The serial/identity alone does not determine the PSK. A captured TLS handshake
 contains the identity, not the key. The paired door ID must be bound to the
 actual sensor. A single compatible candidate can be confirmed directly. With
-multiple candidates, the app requires an observed state change from manually
-moving the intended door rather than selecting an inventory position.
+multiple candidates, the owner starts a fresh identification window and moves
+only the intended door manually. Binding remains unavailable unless exactly one
+sensor changes after that point.
 
 The validated fallback acquired an unchanged mapped firmware image once and
 privately recovered credentials from its device-specific records. The image

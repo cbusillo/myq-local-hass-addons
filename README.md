@@ -36,8 +36,9 @@ are not qualified by the current maintainer.
 3. Start the app and open its web UI. Import your private `enrollment.json`
    file. The app authenticates the hub with controls unavailable and discovers
    its compatible paired sensors. Confirm the single candidate, or manually
-   move the intended door and confirm the sensor whose state changes. Restart
-   the app after binding or replacing enrollment.
+   start identification, move only the intended door, and confirm the sole
+   sensor whose state changes. Restart the app after binding or replacing
+   enrollment.
 4. Redirect **only this hub's TCP 8883** connection to the Home Assistant
    host's app port, default **18883**. Block that hub's direct cloud path,
    including IPv6. See [network setup](docs/network.md). The app does not

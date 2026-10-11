@@ -61,8 +61,12 @@ def run_server(
                         session = Session(
                             profile,
                             on_inventory=(
-                                enrollment.record_inventory if enrollment else None
-                            ),
+                                lambda identifiers: enrollment.record_inventory(
+                                    profile.identity, identifiers
+                                )
+                            )
+                            if enrollment
+                            else None,
                             on_candidate_state=(
                                 enrollment.record_state if enrollment else None
                             ),
