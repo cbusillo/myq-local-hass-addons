@@ -37,5 +37,18 @@ without sending a motion command. The existing Home Assistant MQTT broker and
 HomeKit exposure remained in use.
 
 That acceptance does not qualify other hardware or firmware, prolonged service
-stability, a fresh installation by another owner, or the still-unpackaged
-credential-acquisition workflow.
+stability, or a fresh installation by another owner.
+
+## Enrollment acquisition acceptance
+
+The packaged `myq-enroll acquire` command also passed an owner-observed run on
+the same MYQ-G0401-ES. With an ST-Link/V2 attached to the documented J3 pins,
+the command verified target voltage and debug identities, read each of the
+three required credential pages twice, and refused to print or retain raw
+firmware bytes. The resulting owner-only enrollment file matched the identity,
+PSK, and door ID already accepted by the installed app. Temporary input and
+output files were removed after comparison.
+
+That result proves the bounded acquisition path on one specimen. Another owner
+still needs to reproduce the fixture and workflow before it is described as a
+consumer-ready installation.
