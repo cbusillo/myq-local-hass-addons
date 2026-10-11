@@ -36,9 +36,19 @@ def frame(header, body):
 
 
 class Session:
-    def __init__(self, profile, clock=time.monotonic):
+    def __init__(
+        self,
+        profile,
+        clock=time.monotonic,
+        on_inventory=None,
+        on_candidate_state=None,
+    ):
         self.profile, self.clock = profile, clock
+        self.door_id = profile.door_id
+        self.on_inventory = on_inventory
+        self.on_candidate_state = on_candidate_state
         self.connected = self.subscribed = self.started = self.bound = False
+        self.inventory: tuple[bytes, ...] = ()
         self.state = None
         self.state_at = 0.0
         self.pending = None
@@ -50,18 +60,30 @@ class Session:
         topic = b"G/" + self.profile.identity + b"/" + suffix
         return frame(0x30, len(topic).to_bytes(2, "big") + topic + body)
 
-    def rc2(self, message, value):
+    def rc2_for(self, door_id: bytes, message: int, value: int) -> bytes:
         return self.publish(
             b"011/0000",
-            self.profile.door_id
+            door_id
             + message.to_bytes(2, "little")
             + value.to_bytes(3, "little")
             + b"\0",
         )
 
+    def rc2(self, message, value):
+        require(self.door_id is not None, "not_bound")
+        return self.rc2_for(self.door_id, message, value)
+
     def poll(self):
         require(self.bound, "not_bound")
         return self.rc2(0x80, 0)
+
+    def poll_candidates(self) -> list[bytes]:
+        require(self.inventory and self.door_id is None, "binding_not_active")
+        return [
+            self.rc2_for(identifier, 0x80, 0)
+            for identifier in self.inventory
+            if identifier[0] == 0x84
+        ]
 
     def fresh(self):
         return (
@@ -189,16 +211,30 @@ class Session:
                 "inventory_format",
             )
             ids = [payload[i : i + 6] for i in range(0, len(payload), 6)]
-            require(
-                len(set(ids)) == len(ids) and ids.count(self.profile.door_id) == 1,
-                "target_binding",
-            )
+            require(len(set(ids)) == len(ids), "duplicate_inventory_id")
+            self.inventory = tuple(ids)
+            if self.door_id is None:
+                if self.on_inventory:
+                    self.on_inventory(self.inventory)
+                return self.poll_candidates(), None
+            require(ids.count(self.door_id) == 1, "target_binding")
             self.bound = True
             return [self.poll()], None
         if suffix == b"011/0000":
-            require(self.bound and len(payload) == 12, "rc2_format")
+            require(len(payload) == 12, "rc2_format")
+            identifier = payload[:6]
+            if self.door_id is None:
+                require(identifier in self.inventory, "candidate_not_in_inventory")
+                if payload[6:8] == b"\x81\0":
+                    require(not (payload[10] & 0xF0 or payload[11]), "reserved_bits")
+                    value = int.from_bytes(payload[8:11], "little")
+                    state = (value >> 16) & 15
+                    if self.on_candidate_state:
+                        self.on_candidate_state(identifier, state)
+                return [], None
+            require(self.bound, "rc2_before_binding")
             if (
-                hmac.compare_digest(payload[:6], self.profile.door_id)
+                hmac.compare_digest(identifier, self.door_id)
                 and payload[6:8] == b"\x81\0"
             ):
                 require(not (payload[10] & 0xF0 or payload[11]), "reserved_bits")

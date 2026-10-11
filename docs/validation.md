@@ -52,3 +52,17 @@ output files were removed after comparison.
 That result proves the bounded acquisition path on one specimen. Another owner
 still needs to reproduce the fixture and workflow before it is described as a
 consumer-ready installation.
+
+## Sensor binding validation
+
+The isolated container smoke test imports an unbound schema-2 enrollment,
+authenticates a simulated hub with invented credentials, receives its paired
+inventory, and confirms the one compatible sensor. It verifies that binding
+sends no motion command and that Home Assistant discovery exposes no open or
+close payload while the profile is unbound. After an app restart, the completed
+schema-1 profile passes the existing state and explicit-command cycles.
+
+Multiple-candidate tests require an observed state transition before a candidate
+can be confirmed, preserve candidate labels across inventory reordering, and
+never return raw device identifiers through the setup status endpoint. These
+tests do not replace an owner-observed run against the installed hub.

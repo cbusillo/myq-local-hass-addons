@@ -12,7 +12,7 @@ import uuid
 from pathlib import Path
 
 from .mqtt_bridge import Bridge, BrokerSettings
-from .profile import InvalidProfile, Profile
+from .profile import EnrollmentState, InvalidProfile, Profile
 from .server import run_server
 from .setup_ui import setup_server
 
@@ -76,7 +76,8 @@ def run(data_dir: Path, options_path: Path):
     for sig in (signal.SIGINT, signal.SIGTERM):
         signal.signal(sig, stopped)
     profile_path = data_dir / "enrollment.json"
-    ui = setup_server(profile_path, port=int(options.get("ui_port", 8099)))
+    enrollment = EnrollmentState(profile_path)
+    ui = setup_server(enrollment, port=int(options.get("ui_port", 8099)))
     ui_thread = threading.Thread(target=ui.serve_forever, daemon=True)
     ui_thread.start()
     bridge = None
@@ -97,11 +98,16 @@ def run(data_dir: Path, options_path: Path):
             settings(options),
             node_id,
             options.get("name", "Garage door"),
-            control_enabled=options.get("control_enabled", False),
+            control_enabled=options.get("control_enabled", False) and profile.bound,
         )
         bridge.start()
         run_server(
-            profile, bridge, stop, peers, port=int(options.get("hub_port", 8883))
+            profile,
+            bridge,
+            stop,
+            peers,
+            port=int(options.get("hub_port", 8883)),
+            enrollment=enrollment if not profile.bound else None,
         )
     finally:
         stop.set()

@@ -26,25 +26,23 @@ class Credentials:
     model: str
     identity: bytes
     psk: bytes
-    door_id: bytes
+    door_id: bytes | None = None
 
     def payload(self) -> bytes:
         identity_name = "serial" if self.model == "050DCTWF" else "identity"
-        return (
-            json.dumps(
-                {
-                    "schema": 1,
-                    "model": self.model,
-                    identity_name: self.identity.decode("ascii"),
-                    "psk": self.psk.hex(),
-                    (
-                        "device_id" if self.model == "050DCTWF" else "door_id"
-                    ): self.door_id.hex(),
-                },
-                indent=2,
+        if self.model == "050DCTWF" and self.door_id is None:
+            raise EnrollmentError("050dctwf_device_id_required")
+        row = {
+            "schema": 2 if self.door_id is None else 1,
+            "model": self.model,
+            identity_name: self.identity.decode("ascii"),
+            "psk": self.psk.hex(),
+        }
+        if self.door_id is not None:
+            row["device_id" if self.model == "050DCTWF" else "door_id"] = (
+                self.door_id.hex()
             )
-            + "\n"
-        ).encode()
+        return (json.dumps(row, indent=2) + "\n").encode()
 
 
 def _load_module(name: str, path: Path) -> ModuleType:
@@ -114,7 +112,7 @@ def _newest_sequence(pages: list[tuple[int, int, int]]) -> tuple[int, int, int]:
     return candidates[0]
 
 
-def extract_g0401_region(data: bytes, door_id: bytes) -> Credentials:
+def extract_g0401_region(data: bytes, door_id: bytes | None = None) -> Credentials:
     if len(data) != 3 * 4096:
         raise EnrollmentError("g0401_region_must_contain_three_pages")
     _, psmtool = load_community_tools()
@@ -157,7 +155,7 @@ def extract_g0401_region(data: bytes, door_id: bytes) -> Credentials:
     )
 
 
-def extract_g0401(data: bytes, door_id: bytes) -> Credentials:
+def extract_g0401(data: bytes, door_id: bytes | None = None) -> Credentials:
     if len(data) != 8 * 1024 * 1024:
         raise EnrollmentError("g0401_image_must_be_exactly_8_mib")
     return extract_g0401_region(data[0x202000:0x205000], door_id)
@@ -253,14 +251,14 @@ def _parser() -> argparse.ArgumentParser:
     )
     extract.add_argument("--model", required=True, choices=("MYQ-G0401-ES", "050DCTWF"))
     extract.add_argument("--image", required=True, type=Path)
-    extract.add_argument("--door-id-file", required=True, type=Path)
+    extract.add_argument("--door-id-file", type=Path)
     extract.add_argument("--output", required=True, type=Path)
     acquire = sub.add_parser(
         "acquire", help="read G0401 enrollment directly through an ST-Link/V2"
     )
     acquire.add_argument("--model", required=True, choices=("MYQ-G0401-ES",))
     acquire.add_argument("--firmware", required=True, choices=("1.10",))
-    acquire.add_argument("--door-id-file", required=True, type=Path)
+    acquire.add_argument("--door-id-file", type=Path)
     acquire.add_argument("--output", required=True, type=Path)
     acquire.add_argument("--openocd", type=Path)
     return parser
@@ -277,7 +275,13 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 0
     try:
-        door_id = _door_id(_private_value(args.door_id_file), args.model)
+        if args.model == "050DCTWF" and args.door_id_file is None:
+            raise EnrollmentError("050dctwf_device_id_file_required")
+        door_id = (
+            _door_id(_private_value(args.door_id_file), args.model)
+            if args.door_id_file is not None
+            else None
+        )
         if args.command == "acquire":
             output_fd = reserve_private(args.output)
             try:

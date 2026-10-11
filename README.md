@@ -34,7 +34,10 @@ are not qualified by the current maintainer.
    source NAT when forwarding the hub, set **Translated peer IP** to that
    router's LAN address. Leave **Control enabled** off initially.
 3. Start the app and open its web UI. Import your private `enrollment.json`
-   file. Restart the app after importing or replacing enrollment.
+   file. The app authenticates the hub with controls unavailable and discovers
+   its compatible paired sensors. Confirm the single candidate, or manually
+   move the intended door and confirm the sensor whose state changes. Restart
+   the app after binding or replacing enrollment.
 4. Redirect **only this hub's TCP 8883** connection to the Home Assistant
    host's app port, default **18883**. Block that hub's direct cloud path,
    including IPv6. See [network setup](docs/network.md). The app does not
@@ -63,14 +66,16 @@ this is not proof that one is impossible. Once the enrollment file is imported,
 ordinary operation does not use a programmer or firmware image.
 
 The guided G0401 command performs the one-time credential read and creates the
-private bundle locally. A sensor-binding wizard and reproduction by another
-owner are still needed before claiming a consumer-ready installation. See
-[enrollment](docs/enrollment.md).
+private unbound bundle locally. The app completes enrollment from authenticated
+sensor inventory while motion controls remain unavailable. Reproduction by
+another owner is still needed before claiming a consumer-ready installation.
+See [enrollment](docs/enrollment.md).
 
-Keep enrollment private. It contains the device identity, TLS PSK, and paired
-door identifier. Never publish it, a raw firmware image, or an unredacted
-capture in an issue. The app does not return enrollment contents in its web UI
-or diagnostics. App data and Home Assistant backups may contain the key.
+Keep enrollment private. It contains the device identity and TLS PSK, and gains
+the paired door identifier after binding. Never publish it, a raw firmware
+image, or an unredacted capture in an issue. The app does not return enrollment
+contents in its web UI or diagnostics. App data and Home Assistant backups may
+contain the key.
 
 ### One starting point
 
@@ -84,27 +89,25 @@ The assistant keeps the hardware-specific steps behind one command:
   8 MiB SPI dump and reuses StanleyCA's preserved PSM parser. Hardware
   acquisition remains covered by the community flash guide.
 
-For either model, supply the paired six-byte door ID as twelve hexadecimal
-characters and choose a new output path. This example produces the G0401
-bundle imported by the root app:
+For G0401, choose a new output path. The app discovers and binds the paired
+sensor after this bundle is imported:
 
 ```sh
 uv run myq-enroll extract \
   --model MYQ-G0401-ES \
   --image /private/path/to/your-image.bin \
-  --door-id-file /private/path/to/door-id.txt \
   --output /private/path/to/enrollment.json
 ```
 
 The command refuses an existing output file, writes a new file with owner-only
 permissions, and does not print credentials. Keep the input image and generated
-file private. The 050DCTWF door ID still comes from its documented decrypted
-MQTT capture workflow; dump parsing alone does not recover it. Its output is a
-community credential bundle with `serial`, `psk`, and `device_id` fields for
-the community app's configuration, rather than an import for the root G0401
-app. The door-ID file must contain only the twelve hexadecimal characters and
-have owner-only permissions (`0600`); this keeps the identifier out of shell
-history and process listings.
+file private. The 050DCTWF device ID still comes from its documented decrypted
+MQTT capture workflow; dump parsing alone does not recover it. That profile
+still requires `--door-id-file` and produces a community credential bundle with
+`serial`, `psk`, and `device_id` fields for the community app's configuration,
+rather than an import for the root G0401 app. Its device-ID file must contain
+only the twelve hexadecimal characters and have owner-only permissions
+(`0600`); this keeps the identifier out of shell history and process listings.
 
 For a stock MYQ-G0401-ES running firmware 1.10, install OpenOCD 0.12.0 and
 connect only ST-Link/V2 GND to J3 pin 3, SWDIO to pin 2, and SWCLK to pin 4. Power
@@ -115,7 +118,6 @@ disconnected. Then run:
 uv run myq-enroll acquire \
   --model MYQ-G0401-ES \
   --firmware 1.10 \
-  --door-id-file /private/path/to/door-id.txt \
   --output /private/path/to/enrollment.json
 ```
 
