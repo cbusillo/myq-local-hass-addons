@@ -110,6 +110,8 @@ class ProfileTests(unittest.TestCase):
             enrollment.record_state(DOOR, 2)
             enrollment.record_state(other, 2)
             enrollment.start_identification()
+            enrollment.record_state(DOOR, 2)
+            enrollment.record_state(other, 2)
             enrollment.record_state(DOOR, 9)
             changed = enrollment.status()["candidates"][0]
             self.assertTrue(changed["changed"])
@@ -161,6 +163,8 @@ class ProfileTests(unittest.TestCase):
             enrollment.record_state(DOOR, 2)
             enrollment.record_state(other, 2)
             enrollment.start_identification()
+            enrollment.record_state(DOOR, 2)
+            enrollment.record_state(other, 2)
             enrollment.record_state(DOOR, 9)
             enrollment.record_state(other, 9)
             status_row = enrollment.status()
@@ -183,6 +187,9 @@ class ProfileTests(unittest.TestCase):
             enrollment.record_state(other, 2)
             enrollment.start_identification()
             enrollment.record_state(DOOR, 9)
+            self.assertFalse(
+                any(row["changed"] for row in enrollment.status()["candidates"])
+            )
 
             enrollment.record_inventory(IDENTITY, (DOOR, other))
 

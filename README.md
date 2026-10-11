@@ -34,18 +34,19 @@ are not qualified by the current maintainer.
    source NAT when forwarding the hub, set **Translated peer IP** to that
    router's LAN address. Leave **Control enabled** off initially.
 3. Start the app and open its web UI. Import your private `enrollment.json`
-   file. The app authenticates the hub with controls unavailable and discovers
-   its compatible paired sensors. Confirm the single candidate, or manually
-   start identification, move only the intended door, and confirm the sole
-   sensor whose state changes. Restart the app after binding or replacing
-   enrollment.
+   file.
 4. Redirect **only this hub's TCP 8883** connection to the Home Assistant
    host's app port, default **18883**. Block that hub's direct cloud path,
    including IPv6. See [network setup](docs/network.md). The app does not
    change your router automatically.
-5. Confirm the MQTT cover reports the actual door state. Test sensor reception
+5. The app authenticates the hub with controls unavailable and discovers its
+   compatible paired sensors. Confirm the single candidate, or manually start
+   identification, wait for fresh sensor readings, move only the intended door,
+   and confirm the sole sensor whose state changes. Restart the app after
+   binding or replacing enrollment.
+6. Confirm the MQTT cover reports the actual door state. Test sensor reception
    in its final garage mounting location.
-6. Enable **Control enabled** and restart the app only when ready for a
+7. Enable **Control enabled** and restart the app only when ready for a
    supervised open/close qualification. The cover exposes open and close;
    stop and percentage positioning are deliberately absent because they have
    not been established for this hub.

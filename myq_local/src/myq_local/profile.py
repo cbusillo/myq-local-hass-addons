@@ -183,6 +183,7 @@ class EnrollmentState:
                 self.states.get(identifier) is None for identifier in self.candidates
             ):
                 raise InvalidProfile("sensor_baseline_unavailable")
+            self.states = {identifier: None for identifier in self.candidates}
             self.changed = set()
             self.identifying = True
 
