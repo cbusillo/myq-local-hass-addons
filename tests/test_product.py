@@ -172,6 +172,30 @@ class ProfileTests(unittest.TestCase):
             self.assertFalse(reset["ambiguous"])
             self.assertFalse(any(row["changed"] for row in reset["candidates"]))
 
+    def test_reconnect_requires_fresh_sensor_baselines(self):
+        other = bytes.fromhex("84abcdef1200")
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "enrollment.json"
+            save_profile(path, UNBOUND_BUNDLE)
+            enrollment = EnrollmentState(path)
+            enrollment.record_inventory(IDENTITY, (DOOR, other))
+            enrollment.record_state(DOOR, 2)
+            enrollment.record_state(other, 2)
+            enrollment.start_identification()
+            enrollment.record_state(DOOR, 9)
+
+            enrollment.record_inventory(IDENTITY, (DOOR, other))
+
+            status_row = enrollment.status()
+            self.assertFalse(status_row["identifying"])
+            self.assertFalse(status_row["ambiguous"])
+            self.assertTrue(
+                all(row["state"] == "waiting" for row in status_row["candidates"])
+            )
+            self.assertFalse(any(row["changed"] for row in status_row["candidates"]))
+            with self.assertRaisesRegex(InvalidProfile, "baseline_unavailable"):
+                enrollment.start_identification()
+
 
 class ProtocolTests(unittest.TestCase):
     def setUp(self):
@@ -202,7 +226,7 @@ class ProtocolTests(unittest.TestCase):
         self.assertEqual(self.s.command("OPEN")[-12:-6], DOOR)
 
     def test_missing_and_duplicate_binding_rejected(self):
-        for inventory in (b"\x84abcde", DOOR + DOOR):
+        for inventory in (b"", b"\x84abcde", DOOR + DOOR):
             self.setUp()
             with self.assertRaises(ProtocolError):
                 connect_session(self.s, inventory)
@@ -224,6 +248,20 @@ class ProtocolTests(unittest.TestCase):
         self.assertEqual([packet[-12:-6] for packet in replies], [DOOR, other])
         status(session, 2)
         self.assertEqual(states, [(DOOR, 2)])
+
+    def test_unbound_empty_inventory_is_reported_without_a_poll(self):
+        inventories = []
+        session = Session(
+            Profile.parse(UNBOUND_BUNDLE),
+            clock=lambda: self.now,
+            on_inventory=lambda values: inventories.append(values),
+        )
+
+        replies, state = connect_session(session, b"")
+
+        self.assertEqual(replies, [])
+        self.assertEqual(state, [])
+        self.assertEqual(inventories, [()])
         self.assertFalse(session.bound)
         self.assertFalse(session.fresh())
         with self.assertRaisesRegex(ProtocolError, "fresh_state_required"):

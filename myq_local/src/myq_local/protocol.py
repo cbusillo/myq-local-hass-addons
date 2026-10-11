@@ -206,7 +206,7 @@ class Session:
             require(
                 self.started
                 and not self.bound
-                and 0 < len(payload) <= 108
+                and len(payload) <= 108
                 and len(payload) % 6 == 0,
                 "inventory_format",
             )
@@ -216,7 +216,7 @@ class Session:
             if self.door_id is None:
                 if self.on_inventory:
                     self.on_inventory(self.inventory)
-                return self.poll_candidates(), None
+                return self.poll_candidates() if self.inventory else [], None
             require(ids.count(self.door_id) == 1, "target_binding")
             self.bound = True
             return [self.poll()], None

@@ -151,7 +151,6 @@ class EnrollmentState:
             if not hmac.compare_digest(profile.identity, identity):
                 self._clear_binding_state()
                 return
-            same_inventory = compatible == self.candidates
             old_tokens = self.tokens
             self.candidates = compatible
             self.inventory_seen = True
@@ -160,10 +159,12 @@ class EnrollmentState:
                 value: old_tokens.get(value, secrets.token_urlsafe(18))
                 for value in compatible
             }
-            self.states = {value: self.states.get(value) for value in compatible}
-            if not same_inventory:
-                self.changed = set()
-                self.identifying = False
+            # Every inventory report starts a new authenticated hub session.
+            # Keep stable labels, but require fresh state baselines before an
+            # identification window can begin after any reconnect.
+            self.states = {value: None for value in compatible}
+            self.changed = set()
+            self.identifying = False
 
     def record_state(self, identifier: bytes, state: int) -> None:
         if state not in (2, 9):
