@@ -109,8 +109,8 @@ def run():
             def page():
                 nonlocal html
                 try:
-                    with urllib.request.urlopen(base, timeout=1) as response:
-                        html = response.read().decode()
+                    with urllib.request.urlopen(base, timeout=1) as page_response:
+                        html = page_response.read().decode()
                     return True
                 except OSError:
                     return False
@@ -146,8 +146,10 @@ def run():
 
             def binding_ready():
                 nonlocal binding
-                with urllib.request.urlopen(base + "/status", timeout=2) as response:
-                    binding = json.loads(response.read())
+                with urllib.request.urlopen(
+                    base + "/status", timeout=2
+                ) as status_response:
+                    binding = json.loads(status_response.read())
                 return len(binding["candidates"]) == 1
 
             wait(binding_ready)
