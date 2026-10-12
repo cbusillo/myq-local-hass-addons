@@ -1,20 +1,29 @@
 # Enrollment status
 
-This version can create or import a private enrollment bundle. Its format is:
+The G0401 acquisition command creates a private unbound enrollment bundle:
 
 ```json
 {
-  "schema": 1,
+  "schema": 2,
   "model": "MYQ-G0401-ES",
   "identity": "<10 hexadecimal ASCII characters>",
-  "psk": "<32 hexadecimal characters encoding the 16-byte PSK>",
-  "door_id": "<12 hexadecimal characters encoding the paired 6-byte ID>"
+  "psk": "<32 hexadecimal characters encoding the 16-byte PSK>"
 }
 ```
 
+After import, the app authenticates the hub, discovers compatible paired-device
+IDs, and keeps controls unavailable. Confirming the intended sensor writes
+the existing schema-1 bound form with its twelve-character `door_id`. Existing
+bound schema-1 files remain accepted.
+
 The serial/identity alone does not determine the PSK. A captured TLS handshake
 contains the identity, not the key. The paired door ID must be bound to the
-actual sensor; selecting the first inventory slot on another hub is insufficient.
+actual sensor. A single compatible candidate can be confirmed directly. With
+multiple candidate IDs, the owner starts a fresh identification window and
+moves only the intended door manually. Binding remains unavailable unless
+exactly one candidate changes after that point. Multiple IDs do not necessarily
+mean multiple physical sensors; the qualified one-sensor installation reports
+two IDs, only one of which changes with the door.
 
 The validated fallback acquired an unchanged mapped firmware image once and
 privately recovered credentials from its device-specific records. The image
@@ -26,6 +35,32 @@ installation requires neither flashing nor credential-provisioning setters.
 Do not write either as an enrollment shortcut.
 
 ## Proven acquisition boundary
+
+### Fixture reference
+
+These photographs show the qualified specimen and the removable spring-pin
+fixture used for its read. They document placement, not a required fixture
+design. Follow the numbered J3 mapping below; wire colors are fixture-specific.
+
+**Board and J3 location**
+
+![G0401 board with J3 beside the radio module](images/g0401-board-overview.jpg)
+
+**J3 close-up**
+
+![Close-up of the unpopulated J3 pads](images/g0401-j3-closeup.jpg)
+
+**Spring-pin contact on J3**
+
+![Spring pins held against the J3 pads](images/g0401-fixture-contact.jpg)
+
+**ST-Link/V2 lead arrangement**
+
+![ST-Link/V2 and its labeled connector](images/g0401-stlink-wiring.jpg)
+
+Power the hub from its normal adapter. Connect only ST-Link/V2 GND to J3 pin 3,
+SWDIO to pin 2, and SWCLK to pin 4. Leave J3 pin 1, reset, SWIM, 3.3 V, and 5 V
+disconnected. Power the hub down before placing or removing the fixture.
 
 The successful specimen read used an ST-Link with OpenOCD to read the running
 Realtek device through its SWD debug port. It read the mapped AP1 window from
@@ -41,8 +76,6 @@ accepted by the installed app.
 
 The remaining limits are:
 
-- The public documentation does not yet identify and photograph a repeatable
-  connector or test-point fixture.
 - The eight-megabyte mapped address window may reflect live translation, caching,
   or decryption. It must not be advertised as a raw or restorable SPI backup.
 - The CPU continued running, so matching sequential reads do not make the image
@@ -66,7 +99,7 @@ The next supported installer should:
    than using specimen-specific offsets alone.
 5. Generate `enrollment.json` locally without printing the identity, PSK, door
    identifier, firmware bytes, or credential-derived hashes.
-6. Start the Home Assistant app with controls disabled and bind the intended
+6. Start the Home Assistant app with controls unavailable and bind the intended
    sensor from authenticated inventory and live status.
 7. Remove the debug fixture before any supervised motion qualification.
 
@@ -75,8 +108,7 @@ project does not need to receive or redistribute either one.
 
 Remaining qualification work:
 
-- Reproduce the read on another MYQ-G0401-ES and document a removable fixture.
-- Provide a sensor-binding wizard with controls disabled while identifying it.
+- Reproduce the read and removable fixture on another MYQ-G0401-ES.
 - Validate any hardware-free candidate before promising wireless-only setup.
 
 Until those pass, this is an expert-assisted experimental installation, not a
@@ -90,7 +122,7 @@ profiles:
 
 | Profile | Acquisition input | Parser | Support |
 |---|---|---|---|
-| MYQ-G0401-ES firmware 1.10 | Guided ST-Link read of three mapped pages, or an existing exact 8 MiB mapped image | Realtek append-log selection plus the audited key unwrap | Maintained experimental |
+| MYQ-G0401-ES firmware 1.10 | Guided ST-Link read of three mapped pages, or an existing exact 8 MiB mapped image; sensor binding follows from authenticated inventory | Realtek append-log selection plus the audited key unwrap | Maintained experimental |
 | 050DCTWF | Exact 4 MiB or 8 MiB SPI image | Preserved StanleyCA WMPT/PSMv2 parser and key unwrap | Community |
 
 The assistant requires an explicit model and refuses size, partition, record,
@@ -105,7 +137,8 @@ firmware image and stops without an output on a disconnect or mismatch. The
 050DCTWF profile still imports a dump rather than controlling a CH341
 programmer. Its `device_id` remains a separate decrypted-traffic result.
 
-The G0401 output is accepted by the root app's enrollment importer. The
-050DCTWF output instead names the community app's `serial`, `psk`, and
-`device_id` configuration fields. The two runtime apps are still
-hardware-specific even though enrollment begins with one command.
+The unbound G0401 output is accepted by the root app's enrollment importer and
+completed there after sensor confirmation. The 050DCTWF output instead names
+the community app's `serial`, `psk`, and `device_id` configuration fields. The
+two runtime apps are still hardware-specific even though enrollment begins with
+one command.

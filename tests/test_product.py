@@ -1,4 +1,5 @@
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -7,7 +8,7 @@ from unittest.mock import MagicMock, Mock, patch
 
 from myq_local.app import settings
 from myq_local.mqtt_bridge import Bridge, BrokerSettings
-from myq_local.profile import InvalidProfile, Profile, save_profile
+from myq_local.profile import EnrollmentState, InvalidProfile, Profile, save_profile
 from myq_local.protocol import ProtocolError, Session, frame
 
 IDENTITY = b"AA12345678"
@@ -19,6 +20,14 @@ BUNDLE = json.dumps(
         "identity": IDENTITY.decode(),
         "psk": bytes(range(16)).hex(),
         "door_id": DOOR.hex(),
+    }
+).encode()
+UNBOUND_BUNDLE = json.dumps(
+    {
+        "schema": 2,
+        "model": "MYQ-G0401-ES",
+        "identity": IDENTITY.decode(),
+        "psk": bytes(range(16)).hex(),
     }
 ).encode()
 
@@ -78,6 +87,122 @@ class ProfileTests(unittest.TestCase):
                     save_profile(p, data)
                 self.assertEqual(p.read_bytes(), BUNDLE)
 
+    def test_unbound_profile_is_completed_from_authenticated_inventory(self):
+        other = bytes.fromhex("84abcdef1200")
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "enrollment.json"
+            save_profile(path, UNBOUND_BUNDLE)
+            self.assertFalse(Profile.load(path).bound)
+            enrollment = EnrollmentState(path)
+            enrollment.record_inventory(IDENTITY, (DOOR, other))
+            initial = enrollment.status()
+            self.assertFalse(initial["bound"])
+            self.assertEqual(len(initial["candidates"]), 2)
+            self.assertNotIn(DOOR.hex(), json.dumps(initial))
+            enrollment.record_inventory(IDENTITY, (other, DOOR))
+            reordered = enrollment.status()
+            self.assertEqual(
+                [row["token"] for row in reordered["candidates"]],
+                [row["token"] for row in initial["candidates"]],
+            )
+            with self.assertRaisesRegex(InvalidProfile, "identification_required"):
+                enrollment.bind(initial["candidates"][0]["token"])
+            enrollment.record_state(DOOR, 2)
+            enrollment.record_state(other, 2)
+            enrollment.start_identification()
+            enrollment.record_state(DOOR, 2)
+            enrollment.record_state(other, 2)
+            enrollment.record_state(DOOR, 9)
+            changed = enrollment.status()["candidates"][0]
+            self.assertTrue(changed["changed"])
+            enrollment.bind(changed["token"])
+            self.assertEqual(Profile.load(path).door_id, DOOR)
+            self.assertEqual(os.stat(path).st_mode & 0o777, 0o600)
+
+    def test_unique_compatible_sensor_can_be_confirmed_without_motion(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "enrollment.json"
+            save_profile(path, UNBOUND_BUNDLE)
+            enrollment = EnrollmentState(path)
+            enrollment.record_inventory(IDENTITY, (b"\x01abcde", DOOR))
+            candidate = enrollment.status()["candidates"][0]
+            enrollment.bind(candidate["token"])
+            self.assertEqual(Profile.load(path).door_id, DOOR)
+
+    def test_replacing_enrollment_clears_authenticated_candidates(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "enrollment.json"
+            save_profile(path, UNBOUND_BUNDLE)
+            enrollment = EnrollmentState(path)
+            enrollment.record_inventory(IDENTITY, (DOOR,))
+            old_token = enrollment.status()["candidates"][0]["token"]
+            replacement = json.loads(UNBOUND_BUNDLE)
+            replacement["identity"] = "BB12345678"
+            enrollment.replace(json.dumps(replacement).encode())
+            self.assertEqual(enrollment.status()["candidates"], [])
+            with self.assertRaisesRegex(InvalidProfile, "unknown_sensor_candidate"):
+                enrollment.bind(old_token)
+
+    def test_inventory_without_a_compatible_sensor_is_reported(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "enrollment.json"
+            save_profile(path, UNBOUND_BUNDLE)
+            enrollment = EnrollmentState(path)
+            enrollment.record_inventory(IDENTITY, (b"\x01abcde",))
+            status_row = enrollment.status()
+            self.assertTrue(status_row["inventory_seen"])
+            self.assertEqual(status_row["candidates"], [])
+
+    def test_multiple_changed_sensors_are_ambiguous_until_restarted(self):
+        other = bytes.fromhex("84abcdef1200")
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "enrollment.json"
+            save_profile(path, UNBOUND_BUNDLE)
+            enrollment = EnrollmentState(path)
+            enrollment.record_inventory(IDENTITY, (DOOR, other))
+            enrollment.record_state(DOOR, 2)
+            enrollment.record_state(other, 2)
+            enrollment.start_identification()
+            enrollment.record_state(DOOR, 2)
+            enrollment.record_state(other, 2)
+            enrollment.record_state(DOOR, 9)
+            enrollment.record_state(other, 9)
+            status_row = enrollment.status()
+            self.assertTrue(status_row["ambiguous"])
+            with self.assertRaisesRegex(InvalidProfile, "identification_required"):
+                enrollment.bind(status_row["candidates"][0]["token"])
+            enrollment.start_identification()
+            reset = enrollment.status()
+            self.assertFalse(reset["ambiguous"])
+            self.assertFalse(any(row["changed"] for row in reset["candidates"]))
+
+    def test_reconnect_requires_fresh_sensor_baselines(self):
+        other = bytes.fromhex("84abcdef1200")
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "enrollment.json"
+            save_profile(path, UNBOUND_BUNDLE)
+            enrollment = EnrollmentState(path)
+            enrollment.record_inventory(IDENTITY, (DOOR, other))
+            enrollment.record_state(DOOR, 2)
+            enrollment.record_state(other, 2)
+            enrollment.start_identification()
+            enrollment.record_state(DOOR, 9)
+            self.assertFalse(
+                any(row["changed"] for row in enrollment.status()["candidates"])
+            )
+
+            enrollment.record_inventory(IDENTITY, (DOOR, other))
+
+            status_row = enrollment.status()
+            self.assertFalse(status_row["identifying"])
+            self.assertFalse(status_row["ambiguous"])
+            self.assertTrue(
+                all(row["state"] == "waiting" for row in status_row["candidates"])
+            )
+            self.assertFalse(any(row["changed"] for row in status_row["candidates"]))
+            with self.assertRaisesRegex(InvalidProfile, "baseline_unavailable"):
+                enrollment.start_identification()
+
 
 class ProtocolTests(unittest.TestCase):
     def setUp(self):
@@ -108,10 +233,46 @@ class ProtocolTests(unittest.TestCase):
         self.assertEqual(self.s.command("OPEN")[-12:-6], DOOR)
 
     def test_missing_and_duplicate_binding_rejected(self):
-        for inventory in (b"\x84abcde", DOOR + DOOR):
+        for inventory in (b"", b"\x84abcde", DOOR + DOOR):
             self.setUp()
             with self.assertRaises(ProtocolError):
                 connect_session(self.s, inventory)
+
+    def test_unbound_session_reports_candidates_but_never_enables_motion(self):
+        other = bytes.fromhex("84abcdef1200")
+        inventories = []
+        states = []
+        session = Session(
+            Profile.parse(UNBOUND_BUNDLE),
+            clock=lambda: self.now,
+            on_inventory=lambda values: inventories.append(values),
+            on_candidate_state=lambda identifier, state: states.append(
+                (identifier, state)
+            ),
+        )
+        replies, _ = connect_session(session, DOOR + other)
+        self.assertEqual(inventories, [(DOOR, other)])
+        self.assertEqual([packet[-12:-6] for packet in replies], [DOOR, other])
+        status(session, 2)
+        self.assertEqual(states, [(DOOR, 2)])
+
+    def test_unbound_empty_inventory_is_reported_without_a_poll(self):
+        inventories = []
+        session = Session(
+            Profile.parse(UNBOUND_BUNDLE),
+            clock=lambda: self.now,
+            on_inventory=lambda values: inventories.append(values),
+        )
+
+        replies, state = connect_session(session, b"")
+
+        self.assertEqual(replies, [])
+        self.assertEqual(state, [])
+        self.assertEqual(inventories, [()])
+        self.assertFalse(session.bound)
+        self.assertFalse(session.fresh())
+        with self.assertRaisesRegex(ProtocolError, "fresh_state_required"):
+            session.command("OPEN")
 
     def test_stale_unknown_and_unbound_states_reject_motion(self):
         with self.assertRaises(ProtocolError):
@@ -181,7 +342,8 @@ class BridgeTests(unittest.TestCase):
         self.b.publish_state(2, True)
         self.b.tick()
 
-    def message(self, payload=b"OPEN", retain=False, dup=False):
+    @staticmethod
+    def message(payload=b"OPEN", retain=False, dup=False):
         return SimpleNamespace(
             topic="myq_local/testnode/command",
             payload=payload,
@@ -266,7 +428,8 @@ class BridgeTests(unittest.TestCase):
 
 
 class ServiceSettingsTests(unittest.TestCase):
-    def service_settings(self, options):
+    @staticmethod
+    def service_settings(options):
         service = {
             "result": "ok",
             "data": {

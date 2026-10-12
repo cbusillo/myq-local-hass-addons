@@ -92,6 +92,14 @@ class EnrollmentTests(unittest.TestCase):
             (result.identity, result.psk, result.door_id), (IDENTITY, KEY, DOOR)
         )
 
+    def test_g0401_defaults_to_unbound_enrollment(self):
+        result = extract_g0401(g0401_image())
+        payload = json.loads(result.payload())
+        self.assertEqual(payload["schema"], 2)
+        self.assertEqual(payload["identity"], IDENTITY.decode())
+        self.assertEqual(payload["psk"], KEY.hex())
+        self.assertNotIn("door_id", payload)
+
     def test_g0401_sequence_wrap_selects_zero_as_newest(self):
         result = extract_g0401(g0401_image(255, 0), DOOR)
         self.assertEqual(result.psk, KEY)
@@ -127,11 +135,8 @@ class EnrollmentTests(unittest.TestCase):
     def test_cli_writes_owner_only_file_without_secret_output(self):
         with tempfile.TemporaryDirectory() as tmp:
             image = Path(tmp) / "image.bin"
-            door_id = Path(tmp) / "door-id"
             output = Path(tmp) / "enrollment.json"
             image.write_bytes(g0401_image())
-            door_id.write_text(DOOR.hex())
-            door_id.chmod(0o600)
             stdout, stderr = StringIO(), StringIO()
             with redirect_stdout(stdout), redirect_stderr(stderr):
                 code = main(
@@ -141,8 +146,6 @@ class EnrollmentTests(unittest.TestCase):
                         "MYQ-G0401-ES",
                         "--image",
                         str(image),
-                        "--door-id-file",
-                        str(door_id),
                         "--output",
                         str(output),
                     ]
@@ -152,10 +155,29 @@ class EnrollmentTests(unittest.TestCase):
             payload = json.loads(output.read_text())
             self.assertEqual(payload["model"], "MYQ-G0401-ES")
             self.assertEqual(payload["psk"], KEY.hex())
+            self.assertNotIn("door_id", payload)
             combined = stdout.getvalue() + stderr.getvalue()
             self.assertNotIn(IDENTITY.decode(), combined)
             self.assertNotIn(KEY.hex(), combined)
             self.assertEqual(main(["profiles"]), 0)
+
+    def test_050_cli_still_requires_device_id_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            image = Path(tmp) / "image.bin"
+            image.write_bytes(image_050())
+            with redirect_stderr(StringIO()):
+                code = main(
+                    [
+                        "extract",
+                        "--model",
+                        "050DCTWF",
+                        "--image",
+                        str(image),
+                        "--output",
+                        str(Path(tmp) / "bundle.json"),
+                    ]
+                )
+            self.assertEqual(code, 2)
 
     def test_050_bundle_uses_community_configuration_names(self):
         result = json.loads(extract_050dctwf(image_050(), DOOR).payload())

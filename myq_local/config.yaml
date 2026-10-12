@@ -1,5 +1,5 @@
 name: myQ Local
-version: "0.2.0"
+version: "0.3.0"
 slug: myq_local
 description: Experimental local control of stock MYQ-G0401-ES hubs
 url: https://github.com/cbusillo/myq-local-hass-addons/blob/main/README.md

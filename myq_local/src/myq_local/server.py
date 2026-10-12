@@ -29,7 +29,15 @@ def tls_context(profile):
     return context
 
 
-def run_server(profile, bridge, stop, allowed_peers, host="0.0.0.0", port=8883):
+def run_server(
+    profile,
+    bridge,
+    stop,
+    allowed_peers,
+    host="0.0.0.0",
+    port=8883,
+    enrollment=None,
+):
     context = tls_context(profile)
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
         listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -50,7 +58,19 @@ def run_server(profile, bridge, stop, allowed_peers, host="0.0.0.0", port=8883):
                     connection.settimeout(5)
                     with context.wrap_socket(connection, server_side=True) as tls:
                         tls.settimeout(0.2)
-                        session = Session(profile)
+                        session = Session(
+                            profile,
+                            on_inventory=(
+                                lambda identifiers: enrollment.record_inventory(
+                                    profile.identity, identifiers
+                                )
+                            )
+                            if enrollment
+                            else None,
+                            on_candidate_state=(
+                                enrollment.record_state if enrollment else None
+                            ),
+                        )
                         last_poll = last_publish = time.monotonic()
                         last_receive = time.monotonic()
                         while not stop.is_set():
@@ -73,6 +93,14 @@ def run_server(profile, bridge, stop, allowed_peers, host="0.0.0.0", port=8883):
                                 last_publish = time.monotonic()
                             if session.bound and time.monotonic() - last_poll >= 30:
                                 tls.sendall(session.poll())
+                                last_poll = time.monotonic()
+                            elif (
+                                not session.bound
+                                and session.inventory
+                                and time.monotonic() - last_poll >= 5
+                            ):
+                                for packet in session.poll_candidates():
+                                    tls.sendall(packet)
                                 last_poll = time.monotonic()
                             action = bridge.take_command()
                             if action:

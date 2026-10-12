@@ -13,7 +13,7 @@ from pathlib import Path
 import paho.mqtt.client as mqtt
 from paho.mqtt.packettypes import PacketTypes
 from paho.mqtt.properties import Properties
-from test_product import BUNDLE
+from test_product import UNBOUND_BUNDLE
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -104,22 +104,24 @@ def run():
             created.append(("container", app_name))
             ui_port = int(docker("port", app_name, "8099/tcp").rsplit(":", 1)[1])
             base = f"http://127.0.0.1:{ui_port}"
-            html = None
+            html = ""
 
             def page():
                 nonlocal html
                 try:
-                    with urllib.request.urlopen(base, timeout=1) as response:
-                        html = response.read().decode()
+                    with urllib.request.urlopen(base, timeout=1) as page_response:
+                        html = page_response.read().decode()
                     return True
                 except OSError:
                     return False
 
             wait(page)
-            token = json.loads(re.search(r"const csrf=(.*?);", html).group(1))
+            token_match = re.search(r"const csrf=(.*?);", html)
+            assert token_match is not None
+            token = json.loads(token_match.group(1))
             request = urllib.request.Request(
                 base + "/enroll",
-                data=BUNDLE,
+                data=UNBOUND_BUNDLE,
                 headers={"Content-Type": "application/json", "X-Setup-Token": token},
             )
             with urllib.request.urlopen(request, timeout=5) as response:
@@ -136,6 +138,54 @@ def run():
                 for line in hub.stdout:
                     actions.append(line.strip())
 
+            collector = threading.Thread(target=collect, daemon=True)
+            collector.start()
+            wait(lambda: "READY" in actions)
+
+            binding = {}
+
+            def binding_ready():
+                nonlocal binding
+                with urllib.request.urlopen(
+                    base + "/status", timeout=2
+                ) as status_response:
+                    binding = json.loads(status_response.read())
+                return len(binding["candidates"]) == 1
+
+            wait(binding_ready)
+            configs = [
+                (topic, json.loads(payload))
+                for topic, payload in messages
+                if topic.endswith("/config")
+            ]
+            assert configs[-1][1]["payload_open"] is None
+            assert actions == ["READY"], "binding_sent_motion"
+            request = urllib.request.Request(
+                base + "/bind",
+                data=json.dumps(
+                    {"candidate": binding["candidates"][0]["token"]}
+                ).encode(),
+                headers={"Content-Type": "application/json", "X-Setup-Token": token},
+            )
+            with urllib.request.urlopen(request, timeout=5) as response:
+                assert response.status == 200
+            with urllib.request.urlopen(base + "/status", timeout=2) as response:
+                assert json.loads(response.read())["bound"] is True
+
+            hub.terminate()
+            hub.communicate(timeout=3)
+            hub = None
+            docker("restart", app_name)
+            wait(
+                lambda: docker("logs", app_name).count("Local hub listener ready") >= 2
+            )
+            actions.clear()
+            hub = subprocess.Popen(
+                ["docker", "exec", app_name, "python", "/test/fake_hub.py"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
             collector = threading.Thread(target=collect, daemon=True)
             collector.start()
             wait(lambda: "READY" in actions)
@@ -156,6 +206,7 @@ def run():
                 config["optimistic"] is False
                 and config["payload_stop"] is None
                 and "position_topic" not in config
+                and config["payload_open"] == "OPEN"
             )
             command = config["command_topic"]
             expiry = Properties(PacketTypes.PUBLISH)
@@ -193,6 +244,8 @@ def run():
                     {
                         "container_smoke": "passed",
                         "invented_credentials_only": True,
+                        "unbound_sensor_binding": True,
+                        "binding_sent_no_motion": True,
                         "retained_command_rejected": True,
                         "two_explicit_cycles": True,
                         "state_topic_nonoptimistic": True,

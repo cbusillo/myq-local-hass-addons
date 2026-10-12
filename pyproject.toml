@@ -1,6 +1,6 @@
 [project]
 name = "myq-local-ha"
-version = "0.2.0"
+version = "0.3.0"
 description = "Experimental local control of stock MYQ-G0401-ES hubs through Home Assistant MQTT"
 license = "AGPL-3.0-or-later"
 license-files = ["LICENSE"]
