@@ -40,9 +40,10 @@ are not qualified by the current maintainer.
    including IPv6. See [network setup](docs/network.md). The app does not
    change your router automatically.
 5. The app authenticates the hub with controls unavailable and discovers its
-   compatible paired sensors. Confirm the single candidate, or manually start
+   compatible paired-device IDs. Confirm the single candidate, or manually start
    identification, wait for fresh sensor readings, move only the intended door,
-   and confirm the sole sensor whose state changes. Restart the app after
+   and confirm the sole candidate whose state changes. Multiple IDs do not
+   necessarily mean multiple physical sensors. Restart the app after
    binding or replacing enrollment.
 6. Confirm the MQTT cover reports the actual door state. Test sensor reception
    in its final garage mounting location.
@@ -69,7 +70,7 @@ ordinary operation does not use a programmer or firmware image.
 
 The guided G0401 command performs the one-time credential read and creates the
 private unbound bundle locally. The app completes enrollment from authenticated
-sensor inventory while motion controls remain unavailable. Reproduction by
+paired-device inventory while motion controls remain unavailable. Reproduction by
 another owner is still needed before claiming a consumer-ready installation.
 See [enrollment](docs/enrollment.md).
 
@@ -111,10 +112,11 @@ rather than an import for the root G0401 app. Its device-ID file must contain
 only the twelve hexadecimal characters and have owner-only permissions
 (`0600`); this keeps the identifier out of shell history and process listings.
 
-For a stock MYQ-G0401-ES running firmware 1.10, install OpenOCD 0.12.0 and
-connect only ST-Link/V2 GND to J3 pin 3, SWDIO to pin 2, and SWCLK to pin 4. Power
-the hub from its normal adapter. Leave J3 pin 1, reset, SWIM, 3.3 V, and 5 V
-disconnected. Then run:
+For a stock MYQ-G0401-ES running firmware 1.10, install OpenOCD 0.12.0 and use
+the [fixture photographs and wiring reference](docs/enrollment.md#fixture-reference).
+Connect only ST-Link/V2 GND to J3 pin 3, SWDIO to pin 2, and SWCLK to pin 4.
+Power the hub from its normal adapter. Leave J3 pin 1, reset, SWIM, 3.3 V, and
+5 V disconnected. Then run:
 
 ```sh
 uv run myq-enroll acquire \

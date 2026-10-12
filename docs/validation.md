@@ -63,8 +63,16 @@ close payload while the profile is unbound. After an app restart, the completed
 schema-1 profile passes the existing state and explicit-command cycles.
 
 Multiple-candidate tests require fresh baselines and exactly one state transition
-after the owner starts identification. They reject an ambiguous two-sensor
-change, reset the observation window on request, preserve candidate labels
-across inventory reordering, and never return raw device identifiers through
-the setup status endpoint. These tests do not replace an owner-observed run
-against the installed hub.
+after the owner starts identification. They reject an ambiguous change, reset
+the observation window on request, preserve candidate labels across inventory
+reordering, and never return raw device identifiers through the setup status
+endpoint.
+
+The packaged candidate then passed an owner-observed controls-disabled binding
+run on the qualified stock hub. Although the hub inventory contained two
+compatible candidate IDs for the installation's one physical door sensor, both
+began with fresh closed baselines and only one changed when the owner manually
+opened the door. That candidate exactly matched the previously proven sensor ID.
+The app saved it, retained the binding after restart, and Home Assistant reported
+the manual open and close transitions. Controls remained unavailable throughout,
+and the app sent no motion command.
