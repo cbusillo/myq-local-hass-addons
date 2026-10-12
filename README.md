@@ -63,6 +63,12 @@ separate host web port. Keep the hub listener LAN-only.
 
 ## One-time enrollment
 
+<a href="docs/enrollment.md#fixture-reference">
+  <img src="docs/images/g0401-stlink-wiring.jpg" alt="ST-Link/V2 programmer and wiring used for G0401 enrollment" width="640">
+</a>
+
+**[See the photographed fixture and wiring guide](docs/enrollment.md#fixture-reference).**
+
 The current proven enrollment route requires a one-time hardware read of
 per-device credentials. A hardware-free enrollment path has not been found;
 this is not proof that one is impossible. Once the enrollment file is imported,
