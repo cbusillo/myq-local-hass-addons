@@ -342,7 +342,8 @@ class BridgeTests(unittest.TestCase):
         self.b.publish_state(2, True)
         self.b.tick()
 
-    def message(self, payload=b"OPEN", retain=False, dup=False):
+    @staticmethod
+    def message(payload=b"OPEN", retain=False, dup=False):
         return SimpleNamespace(
             topic="myq_local/testnode/command",
             payload=payload,
@@ -427,7 +428,8 @@ class BridgeTests(unittest.TestCase):
 
 
 class ServiceSettingsTests(unittest.TestCase):
-    def service_settings(self, options):
+    @staticmethod
+    def service_settings(options):
         service = {
             "result": "ok",
             "data": {

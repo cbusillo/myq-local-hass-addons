@@ -104,7 +104,7 @@ def run():
             created.append(("container", app_name))
             ui_port = int(docker("port", app_name, "8099/tcp").rsplit(":", 1)[1])
             base = f"http://127.0.0.1:{ui_port}"
-            html = None
+            html = ""
 
             def page():
                 nonlocal html
@@ -116,7 +116,9 @@ def run():
                     return False
 
             wait(page)
-            token = json.loads(re.search(r"const csrf=(.*?);", html).group(1))
+            token_match = re.search(r"const csrf=(.*?);", html)
+            assert token_match is not None
+            token = json.loads(token_match.group(1))
             request = urllib.request.Request(
                 base + "/enroll",
                 data=UNBOUND_BUNDLE,

@@ -42,13 +42,21 @@ These photographs show the qualified specimen and the removable spring-pin
 fixture used for its read. They document placement, not a required fixture
 design. Follow the numbered J3 mapping below; wire colors are fixture-specific.
 
-| Board and J3 location | J3 close-up |
-| --- | --- |
-| ![G0401 board with J3 beside the radio module](images/g0401-board-overview.jpg) | ![Close-up of the unpopulated J3 pads](images/g0401-j3-closeup.jpg) |
+**Board and J3 location**
 
-| Spring-pin contact on J3 | ST-Link/V2 lead arrangement |
-| --- | --- |
-| ![Spring pins held against the J3 pads](images/g0401-fixture-contact.jpg) | ![ST-Link/V2 and its labeled connector](images/g0401-stlink-wiring.jpg) |
+![G0401 board with J3 beside the radio module](images/g0401-board-overview.jpg)
+
+**J3 close-up**
+
+![Close-up of the unpopulated J3 pads](images/g0401-j3-closeup.jpg)
+
+**Spring-pin contact on J3**
+
+![Spring pins held against the J3 pads](images/g0401-fixture-contact.jpg)
+
+**ST-Link/V2 lead arrangement**
+
+![ST-Link/V2 and its labeled connector](images/g0401-stlink-wiring.jpg)
 
 Power the hub from its normal adapter. Connect only ST-Link/V2 GND to J3 pin 3,
 SWDIO to pin 2, and SWCLK to pin 4. Leave J3 pin 1, reset, SWIM, 3.3 V, and 5 V
