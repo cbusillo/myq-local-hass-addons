@@ -34,7 +34,7 @@ refresh();setInterval(refresh,2000);</script></body></html>"""
     page = page.replace("TOKEN", json.dumps(token)).encode()
 
     class Handler(BaseHTTPRequestHandler):
-        def log_message(self, format_string, *args):
+        def log_message(self, format, *args):
             pass
 
         def reply(self, code, body, kind="application/json"):
