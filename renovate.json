@@ -1,4 +1,16 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["github>cbusillo/odoo-devkit//renovate/default"]
+  "extends": ["github>cbusillo/odoo-devkit//renovate/default"],
+  "packageRules": [
+    {
+      "description": "myq_local/requirements.txt is exported from uv.lock, and Renovate cannot run uv export, so an automatic Python update would leave the add-on image's hashed requirements stale. Update Python dependencies with uv lock plus uv export.",
+      "matchManagers": ["pep621", "pip_requirements"],
+      "enabled": false
+    },
+    {
+      "description": "Add-on base images wait 30 days after release.",
+      "matchManagers": ["dockerfile"],
+      "minimumReleaseAge": "30 days"
+    }
+  ]
 }
