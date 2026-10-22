@@ -8,6 +8,11 @@
       "enabled": false
     },
     {
+      "description": "community/050dctwf preserves a hardware-tested upstream snapshot; it is not updated.",
+      "matchFileNames": ["community/**"],
+      "enabled": false
+    },
+    {
       "description": "Add-on base images wait 30 days after release.",
       "matchManagers": ["dockerfile"],
       "minimumReleaseAge": "30 days"
