@@ -14,3 +14,9 @@ acceptance. Unknown status bits are not safety interlocks or battery readings.
 Preserve the existing Home Assistant broker and HomeKit exposure. The app starts
 with controls disabled. Router changes are outside product source and require
 exact scope, rollback, and independent validation.
+
+## What myQ Local does
+
+myQ Local bridges supported myQ garage-door hardware to Home Assistant through a local connection and the existing MQTT broker.
+The maintained hub path has one owner-observed specimen; other hardware and firmware remain unqualified unless documented separately.
+Evidence: [README.md](README.md) and [hardware support](docs/hardware-support.md); this description does not authorize door motion.
