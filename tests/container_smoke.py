@@ -204,9 +204,15 @@ def run():
             configs = [
                 (topic, json.loads(payload))
                 for topic, payload in messages
-                if topic.endswith("/config")
+                if topic.startswith("homeassistant/cover/")
             ]
             assert len(configs) >= 1
+            buttons = [
+                json.loads(payload)
+                for topic, payload in messages
+                if topic.startswith("homeassistant/button/") and payload
+            ]
+            assert buttons and buttons[-1]["payload_press"] == "CLOSE_QUIET"
             config = configs[-1][1]
             assert (
                 config["optimistic"] is False
