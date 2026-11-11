@@ -9,6 +9,11 @@ class ProtocolError(ValueError):
     pass
 
 
+# RC2 0x0280 door-action values. CLOSE is the myQ app's warned close; the
+# embedded radio firmware takes its direct-close branch when bit 0 is set.
+DOOR_ACTIONS = {"OPEN": 0x10100, "CLOSE": 0x100, "CLOSE_QUIET": 0x101}
+
+
 def require(condition, code):
     if not condition:
         raise ProtocolError(code)
@@ -91,13 +96,13 @@ class Session:
         )
 
     def command(self, action):
-        require(action in ("OPEN", "CLOSE"), "unsupported_command")
+        require(action in DOOR_ACTIONS, "unsupported_command")
         require(self.fresh(), "fresh_state_required")
         require(self.pending is None, "motion_pending")
         require(self.state == (2 if action == "OPEN" else 9), "state_mismatch")
         self.pending = action
         # Mark attempted before write; never replay an uncertain send.
-        return self.rc2(0x280, 0x10100 if action == "OPEN" else 0x100)
+        return self.rc2(0x280, DOOR_ACTIONS[action])
 
     def feed(self, data):
         self.buffer.extend(data)
@@ -242,7 +247,7 @@ class Session:
                 self.state = (value >> 16) & 15
                 self.state_at = self.clock()
                 if (self.pending == "OPEN" and self.state == 9) or (
-                    self.pending == "CLOSE" and self.state == 2
+                    self.pending in ("CLOSE", "CLOSE_QUIET") and self.state == 2
                 ):
                     self.pending = None
                 return [], self.state
