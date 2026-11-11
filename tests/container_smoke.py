@@ -156,9 +156,15 @@ def run():
             configs = [
                 (topic, json.loads(payload))
                 for topic, payload in messages
-                if topic.endswith("/config")
+                if topic.startswith("homeassistant/cover/")
             ]
             assert configs[-1][1]["payload_open"] is None
+            buttons = [
+                payload
+                for topic, payload in messages
+                if topic.startswith("homeassistant/button/")
+            ]
+            assert buttons and not buttons[-1], "quiet_close_button_while_disabled"
             assert actions == ["READY"], "binding_sent_motion"
             request = urllib.request.Request(
                 base + "/bind",
