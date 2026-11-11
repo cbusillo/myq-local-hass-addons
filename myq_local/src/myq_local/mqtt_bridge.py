@@ -81,6 +81,20 @@ class Bridge:
             },
         }
 
+    def quiet_close_discovery(self):
+        """A separate button: the cover keeps the warned close."""
+        return {
+            "name": "Close quietly",
+            "unique_id": f"myq_local_{self.node_id}_close_quiet",
+            "command_topic": f"{self.prefix}/command",
+            "payload_press": "CLOSE_QUIET",
+            "availability_topic": f"{self.prefix}/availability",
+            "retain": False,
+            "qos": 0,
+            "message_expiry_interval": {"seconds": 2},
+            "device": {"identifiers": [f"myq_local_{self.node_id}"]},
+        }
+
     def invalidate_commands(self):
         self.generation += 1
         while True:
@@ -102,6 +116,13 @@ class Bridge:
             client.publish(
                 f"homeassistant/cover/{self.node_id}/config",
                 json.dumps(self.discovery()),
+                retain=True,
+            )
+            client.publish(
+                f"homeassistant/button/{self.node_id}/close_quiet/config",
+                json.dumps(self.quiet_close_discovery())
+                if self.control_enabled
+                else "",
                 retain=True,
             )
             client.subscribe(
@@ -139,7 +160,7 @@ class Bridge:
                 or message.topic != f"{self.prefix}/command"
                 or message.retain
                 or message.dup
-                or message.payload not in (b"OPEN", b"CLOSE")
+                or message.payload not in (b"OPEN", b"CLOSE", b"CLOSE_QUIET")
             ):
                 return
             item = (

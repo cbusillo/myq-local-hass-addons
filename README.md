@@ -159,6 +159,15 @@ If movement remains unconfirmed, the session rejects further movement until a
 matching status transition or a fresh connection. Check the physical door
 before restarting the app in that situation.
 
+With controls enabled, the app also adds a **Close quietly** button. It sends
+`CLOSE_QUIET`, the same door action with value `0x00101` instead of `0x00100`.
+In the hub's embedded radio firmware, that bit selects the direct close instead
+of the timed flash-and-beep warning
+([#18](https://github.com/cbusillo/myq-local-hass-addons/issues/18)). It is
+meant for automations that know the owner can see the door. It passes the same
+gates as the cover's close, and the cover's close keeps the warning. The
+opener's safety beam still applies.
+
 This app is not an independent safety system. The opener's physical safety
 controls remain authoritative; use the wall control or remote when needed.
 Do not infer obstruction or battery condition from the currently uninterpreted

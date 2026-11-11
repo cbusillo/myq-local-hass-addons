@@ -223,6 +223,19 @@ class ProtocolTests(unittest.TestCase):
             self.assertEqual(
                 self.s.command("CLOSE")[-12:], DOOR + b"\x80\x02\x00\x01\x00\x00"
             )
+        # The quiet close differs only in bit 0 and completes the same cycle.
+        status(self.s, 2)
+        with self.assertRaisesRegex(ProtocolError, "state_mismatch"):
+            self.s.command("CLOSE_QUIET")
+        self.s.command("OPEN")
+        status(self.s, 9)
+        self.assertEqual(
+            self.s.command("CLOSE_QUIET")[-12:], DOOR + b"\x80\x02\x01\x01\x00\x00"
+        )
+        with self.assertRaisesRegex(ProtocolError, "motion_pending"):
+            self.s.command("CLOSE")
+        status(self.s, 2)
+        self.s.command("OPEN")
 
     def test_inventory_reordering_and_other_door_do_not_change_target(self):
         other = b"\x84abcde"
@@ -364,6 +377,8 @@ class BridgeTests(unittest.TestCase):
         self.b.on_message(None, None, self.message())
         self.assertEqual(self.b.take_command(), "OPEN")
         self.assertIsNone(self.b.take_command())
+        self.b.on_message(None, None, self.message(b"CLOSE_QUIET"))
+        self.assertEqual(self.b.take_command(), "CLOSE_QUIET")
 
     def test_reconnect_and_hub_replacement_drop_queued_commands(self):
         self.b.on_message(None, None, self.message())
@@ -425,6 +440,25 @@ class BridgeTests(unittest.TestCase):
         options = self.b.client.subscribe.call_args.kwargs["options"]
         self.assertTrue(options.retainAsPublished)
         self.assertEqual(options.retainHandling, 2)
+
+    def published_button(self):
+        topic = "homeassistant/button/testnode/close_quiet/config"
+        calls = [c for c in self.b.client.publish.call_args_list if c.args[0] == topic]
+        self.assertEqual(len(calls), 1)
+        self.assertTrue(calls[0].kwargs["retain"])
+        return calls[0].args[1]
+
+    def test_quiet_close_button_exists_only_while_controls_are_enabled(self):
+        connected = SimpleNamespace(is_failure=False)
+        self.b.on_connect(self.b.client, None, None, connected, None)
+        button = json.loads(self.published_button())
+        self.assertEqual(button["payload_press"], "CLOSE_QUIET")
+        self.assertEqual(button["command_topic"], self.b.discovery()["command_topic"])
+        self.assertEqual(button["message_expiry_interval"], {"seconds": 2})
+        self.b.client.publish.reset_mock()
+        self.b.control_enabled = False
+        self.b.on_connect(self.b.client, None, None, connected, None)
+        self.assertEqual(self.published_button(), "")
 
 
 class ServiceSettingsTests(unittest.TestCase):
