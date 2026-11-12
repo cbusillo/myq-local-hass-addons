@@ -3,6 +3,7 @@
 import json
 import logging
 import queue
+import re
 import threading
 import time
 import uuid
@@ -81,6 +82,10 @@ class Bridge:
             },
         }
 
+    @property
+    def slug(self):
+        return re.sub(r"[^a-z0-9]+", "_", self.name.lower()).strip("_") or "myq_local"
+
     def quiet_close_discovery(self):
         """A separate button: the cover keeps the warned close."""
         return {
@@ -88,6 +93,8 @@ class Bridge:
             "unique_id": f"myq_local_{self.node_id}_close_quiet",
             "command_topic": f"{self.prefix}/command",
             "payload_press": "CLOSE_QUIET",
+            # Automations name this entity; a reinstall must recreate the same id.
+            "default_entity_id": f"button.{self.slug}_close_quietly",
             "availability_topic": f"{self.prefix}/availability",
             "retain": False,
             "qos": 0,

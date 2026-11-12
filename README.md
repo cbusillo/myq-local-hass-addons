@@ -164,7 +164,9 @@ With controls enabled, the app also adds a **Close quietly** button. It sends
 In the hub's embedded radio firmware, that bit selects the direct close instead
 of the timed flash-and-beep warning
 ([#18](https://github.com/cbusillo/myq-local-hass-addons/issues/18)). It is
-meant for automations that know the owner can see the door. It passes the same
+meant for automations that know the owner can see the door. Its entity id is
+`button.<name>_close_quietly`, from the configured name (`Garage door` gives
+`button.garage_door_close_quietly`), and stays the same after a reinstall. It passes the same
 gates as the cover's close, and the cover's close keeps the warning. The
 opener's safety beam still applies.
 
