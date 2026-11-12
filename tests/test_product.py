@@ -455,6 +455,13 @@ class BridgeTests(unittest.TestCase):
         self.assertEqual(button["payload_press"], "CLOSE_QUIET")
         self.assertEqual(button["command_topic"], self.b.discovery()["command_topic"])
         self.assertEqual(button["message_expiry_interval"], {"seconds": 2})
+        # The configured name "Garage" gives the id automations use.
+        self.assertEqual(button["default_entity_id"], "button.garage_close_quietly")
+        self.b.name = "Garage Door #2"
+        self.assertEqual(
+            self.b.quiet_close_discovery()["default_entity_id"],
+            "button.garage_door_2_close_quietly",
+        )
         self.b.client.publish.reset_mock()
         self.b.control_enabled = False
         self.b.on_connect(self.b.client, None, None, connected, None)
